@@ -1,0 +1,2032 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+	<title>voronoi-map.js</title>
+	<meta charset="utf-8">
+	<link rel="stylesheet" type="text/css" href="index.css">
+	<script></script>
+	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+	<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.1/css/all.css"
+integrity="sha384-gfdkjb5BdAXd+lj+gudLWI+BXq4IuLW5IT+brZEZsLFm++aCMlF1V92rMkPaX4PP" crossorigin="anonymous">
+	<script src="https://kit.fontawesome.com/bfdd4dd0a2.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+
+
+
+<!-- CANVAS HERE -->
+
+	<fieldset id="fieldset">
+		<div id="fields">
+			<div style="font-size:15px;">voronoi-map-js</div>
+			<br/>
+			<a href="https://github.com/rjanicek/voronoi-map-js">source code on GitHub</a>
+			<br/><br/>
+			<div><label for="seed" title="integer or text">seed</label><input id="seed" type="text" value="voronoi!" /><button id="random">random</button></div>
+			<div>
+				<label for="islandShape">island shape</label>
+				<select id="islandShape">
+					<option>bitmap</option>
+					<option>blob</option>
+					<option>noise</option>
+					<option selected>perlin</option>
+					<option>radial</option>
+					<option>square</option>
+				</select>
+			</div>
+			<div><label for="shapeSeed" title="integer or text">island shape seed</label><input id="shapeSeed" type="text" value="voronoi!" /><button id="shapeRandom">random</button></div>
+			<div>
+				<label for="pointSelection">point selection</label>
+				<select id="pointSelection">
+					<option>random</option>
+					<option selected>relaxed</option>
+					<option>square</option>
+					<option>hex</option>
+				</select>
+			</div>
+			<div style="display:none;"><label for="imageFile" title="black & white images work best">image file</label><input type="file" id="imageFile" name="files[]" /></div>
+			<div style="display:none;"><label for="imageThumb">&nbsp;</label><img id="imageThumb" /></div>
+			<div style="display:none;"><label for="invertImage">invert image?</label><input id="invertImage" type="checkbox" checked /></div>
+			<div style="display:none;"><label for="imageThreshold" title="0 to 255">threshold</label><input id="imageThreshold" type="range" min="0" max="255" value="127" /></div>
+			<div style="display:none;"><label for="islandFactor" title="1.0 means no small islands; 2.0 leads to a lot">island factor</label><input id="islandFactor" type="text" value="1.07" /></div>
+
+			<div><label for="oceanRatio" title="0 = least ocean, 1 = most ocean">ocean ratio</label><input id="oceanRatio" type="text" value="0.5" /></div>
+			<div><label for="width">width</label><input id="width" type="text" value="5000" /></div>
+			<div><label for="height">height</label><input id="height" type="text" value="5000" /></div>
+			<div><label for="numberOfPoints">number of points</label><input id="numberOfPoints" type="text" value="1000" /></div>
+			<div><label for="numberOfLands">number of lands</label><input id="numberOfLands" type="text" value="1000" /></div>
+
+			<div><label for="lakeThreshold" title="0 to 1, fraction of water corners for water polygon">lake threshold</label><input id="lakeThreshold" type="text" value="0.3" /></div>
+			<div><label for="lloydIterations">number of lloyd iterations</label><input id="lloydIterations" type="text" value="8" /></div>
+			<div><label for="riverChance" title="0 = no rivers, &gt; 0 = more rivers">river chance</label><input id="riverChance" type="text" value="200" /></div>
+			<div><label for="edgeNoise" title="0 = noisy edges, &gt; 1 = smooth edges">edge noise</label><input id="edgeNoise" type="text" value="0.5" /></div>
+			<div style="display:none;"><label for="roadElevationThresholds" title="list of floats between 0.0 and 1.0">road elevation thresholds</label><input id="roadElevationThresholds" type="text" value="0, 0.05, 0.37, 0.64" /></div>
+			<br/>
+			<div style="text-align:center;">
+				<button id="generate">generate</button>
+			</div>
+			<div class="section">
+				<label>renderer</label>
+				<select id="renderer">
+					<option selected>canvas</option>
+					<option>pixi webgl</option>
+					<option>pixi canvas</option>
+				</select>
+			</div>
+			<div class="section">
+				<label>view</label>
+				<select id="view">
+					<option>debug polygons</option>
+					<option selected>smooth</option>
+				</select>
+			</div>
+			<div><label for="viewRivers">rivers?</label><input id="viewRivers" type="checkbox" checked /></div>
+			<div><label for="viewRoads">roads?</label><input id="viewRoads" type="checkbox" /></div>
+			
+			<div><label for="viewBridges">bridges?</label><input id="viewBridges" type="checkbox" /></div>
+			<div><label for="viewWatersheds">watersheds?</label><input id="viewWatersheds" type="checkbox" /></div>
+			<div><label for="viewEdges">edges?</label><input id="viewEdges" type="checkbox" /></div>
+			<div><label for="addNoise">add noise?</label><input id="addNoise" type="checkbox" /></div>
+		</div>
+		<a id="toggle" style="float:right;">hide</a>
+	</fieldset>
+
+
+
+
+
+
+
+
+<div id="containerr" style=" position: fixed; right:20px; top: 10px; left: 10px; height: 100px;">
+
+<script>
+
+document.onmousemove = mousemove;
+let clear, mouseX=0, mouseY=0, movebool=true, mouse_x, mouse_y;
+function mousemove(event) {
+   	mouse_x = mouse_y = 0;
+   	if (document.attachEvent != null) {
+       	mouse_x = window.event.clientX;
+       	mouse_y = window.event.clientY;
+   	} else if (!document.attachEvent && document.addEventListener) {
+      	mouse_x = event.clientX;
+      	coordmousex=Math.floor(mouse_x+window.pageXOffset);
+       	mouse_y = event.clientY;
+      	coordmousey=Math.floor(mouse_y+window.pageYOffset);
+
+   	}
+   	status = "x = " + mouse_x + "y = " + mouse_y;
+   	mouseX=mouse_x; mouseY=mouse_y;	
+    return mouse_x, mouse_y;
+}
+function mousemover(){
+	if(movebool){
+	window.scrollBy((mouseX-window.innerWidth/2)/10,(mouseY-window.innerHeight/2)/10);
+	clear = setTimeout(mousemover,100);
+	}
+}
+
+
+</script>
+
+
+
+
+
+<div style="position: fixed; top: 5px; left: 5px; right: 5px; display: grid; grid-template-columns: 16.6% 16.6% 16.6% 16.6% 33.2%; grid-auto-rows: 13px; padding: 0;">
+<div class="acrylic shadow counter4 progress" id="progr_01">
+	<div style="background-color: #2364A9; height: 13px;"></div>
+	<div style="background-color: #73BFB7; height: 13px;"></div>
+	<div style="background-color: #E06D15; height: 13px;"></div>
+	<div style="background-color: #FEC701; height: 13px;"></div>
+	<div id="progrp_01" style="grid-column-start: 1; grid-column-end: 5; margin-top: -12px; padding: 0; background-color: none;">
+		Общество
+	</div>
+</div>
+<div class="acrylic shadow counter4 progress" id="progr_02">
+	<div style="background-color: #2364A9; height: 13px;"></div>
+	<div style="background-color: #73BFB7; height: 13px;"></div>
+	<div style="background-color: #E06D15; height: 13px;"></div>
+	<div style="background-color: #FEC701; height: 13px;"></div>
+	<div id="progrp_02" style="grid-column-start: 1; grid-column-end: 5; margin-top: -12px; padding: 0; background-color: none;">
+		Государство
+	</div>
+</div>
+<div class="acrylic shadow counter4 progress" id="progr_03">
+	<div style="background-color: #2364A9; height: 13px;"></div>
+	<div style="background-color: #73BFB7; height: 13px;"></div>
+	<div style="background-color: #E06D15; height: 13px;"></div>
+	<div style="background-color: #FEC701; height: 13px;"></div>
+	<div id="progrp_03" style="grid-column-start: 1; grid-column-end: 5; margin-top: -12px; padding: 0; background-color: none;">
+		Армия
+	</div>
+</div>
+<div class="acrylic shadow counter4 progress" id="progr_04">
+	<div style="background-color: #2364A9; height: 13px;"></div>
+	<div style="background-color: #73BFB7; height: 13px;"></div>
+	<div style="background-color: #E06D15; height: 13px;"></div>
+	<div style="background-color: #FEC701; height: 13px;"></div>
+	<div id="progrp_04" style="grid-column-start: 1; grid-column-end: 5; margin-top: -12px; padding: 0; background-color: none;">
+		Влияние
+	</div>
+</div>
+
+<div style="margin-top: -5px; margin-left: 5px; margin-right: -10px; display: grid; grid-template-columns: 49.5% 49.5%; height: 15px; grid-auto-rows: 10px; border-radius: 0 0 0 10px; background: #8193a3; border: 1px solid white; padding-top: 5px;">
+<div class="acrylic shadow counter3" style="background-color: white; opacity: 0.75;">
+<i class="fad fa-map-marked-alt fa-xs"></i>
+<i class="fad fa-city fa-xs"></i>
+<i class="fad fa-inventory fa-xs"></i>
+<i class="far fa-landmark fa-xs"></i>
+<i class="fad fa-shield-cross fa-xs"></i>
+<i class="fas fa-anchor fa-xs"></i>
+<i class="fas fa-chess fa-xs"></i>
+<i class="fad fa-chess-rook fa-xs"></i>
+<i class="fad fa-child fa-xs"></i>
+<i class="fad fa-coins fa-xs"></i>
+</div>
+<div class="acrylic shadow counter3" style="background-color: white; opacity: 0.75;">
+
+</div>
+</div>
+</div>
+
+
+<div id="wrapper" class="wrapper" style="display: none; margin-top: 13px;">
+	<div class="acrylic shadow progress" id="m1" style="padding: 0;">
+		<div style="background-color: #2364A9; height: 30px;"></div>
+		<div style="background-color: #73BFB7; height: 30px;"></div>
+		<div style="background-color: #FEC701; height: 30px;"></div>
+		<div id="mp1" style="font-size: small; grid-column-start: 1; grid-column-end: 4; margin-top: -20px; padding: 0; background-color: none;"></div>
+	</div>
+	<div class="acrylic shadow progress" id="m2" style="padding: 0;">
+		<div style="background-color: #2364A9; height: 30px;"></div>
+		<div style="background-color: #73BFB7; height: 30px;"></div>
+		<div style="background-color: #FEC701; height: 30px;"></div>
+		<div id="mp2" style="font-size: small; grid-column-start: 1; grid-column-end: 4; margin-top: -20px; padding: 0; background-color: none;"></div>
+	</div>
+	<div class="acrylic shadow progress" id="m3" style="padding: 0;">
+		<div style="background-color: #2364A9; height: 30px;"></div>
+		<div style="background-color: #73BFB7; height: 30px;"></div>
+		<div style="background-color: #FEC701; height: 30px;"></div>
+		<div id="mp3" style="font-size: small; grid-column-start: 1; grid-column-end: 4; margin-top: -20px; padding: 0; background-color: none;"></div>
+	</div>
+	<div class="acrylic shadow" id="m4" style="font-size: small;">
+	</div>
+	<div class="acrylic shadow" id="m5" style="font-size: small;">
+	</div>
+	<div class="acrylic shadow" id="m6" style="font-size: small;">
+	</div>
+	<div class="acrylic shadow" id="m7" style="font-size: small;">
+	</div>
+	<div class="acrylic shadow" id="m8" style="font-size: small;">
+	</div>
+	<div class="acrylic shadow" id="m9" style="font-size: small;">
+	</div>
+</div>
+
+<script src="voronoi-map-demo.js"></script>
+<script>
+// document.getElementById("random").click();
+// document.getElementById("shapeRandom").click();
+// document.getElementById("generate").click();
+
+
+
+
+
+
+//colorlookingfrompixel
+var canvascolor = document.querySelector('canvas');
+var cncl = canvascolor.getContext('2d');
+
+function getPosition(obj) {
+    var curleft = 0, curtop = 0;
+    if (obj.offsetParent) {
+        do {
+            curleft = curleft+obj.offsetLeft+window.pageXOffset;
+            curtop = curtop+obj.offsetTop+window.pageYOffset;
+        } while (obj = obj.offsetParent);
+        return { x: curleft, y: curtop };
+    }
+    return undefined;
+}
+function rgbToHex(r, g, b) {
+    if (r > 255 || g > 255 || b > 255)
+        throw "Invalid color component";
+    return ((r << 16) | (g << 8) | b).toString(16);
+}
+</script>
+
+
+
+
+</div></div>
+
+
+
+<div id="townmenu" class="acrylic shadow" style=" left: -5px; top: 100px; opacity: 0.5; padding: 5px; background: #8193a3;">
+	<div style="display: grid; grid-template-columns: 70px auto 80px 80px 80px 80px 30px; grid-auto-rows: 20px; ">
+		<div id="townname">_</div>
+		<script>
+		let townparon=true,townpolon=false,townoboron=false,towneconon=false;
+		</script>
+		<div></div>
+		<div id="townpar" class="acrylic shadow" style="border-radius: 5px 5px 0 0; padding: 0; height: 16px; width: 70px; border: 1px solid yellow; box-shadow: inset 2px 2px 10px gold;" onmouseover="this.style.border='1px solid yellow'; this.style.boxShadow='inset 2px 2px 10px gold';" onmouseout="if(!townparon){document.getElementById('townpar').style.border='none'; document.getElementById('townpar').style.boxShadow='none';};" onclick="townparon=true; this.style.border='1px solid yellow'; this.style.boxShadow='inset 2px 2px 10px gold'; townpolon=false; townoboron=false; towneconon=false; document.getElementById('townpol').style.border='none'; document.getElementById('townpol').style.boxShadow='none'; document.getElementById('townobor').style.border='none'; document.getElementById('townobor').style.boxShadow='none'; document.getElementById('townecon').style.border='none'; document.getElementById('townecon').style.boxShadow='none'; ">Параметры</div>
+		<div id="townpol"  class="acrylic shadow" style="border-radius: 5px 5px 0 0; padding: 0; height: 16px; width: 70px;" onmouseover="this.style.border='1px solid yellow'; this.style.boxShadow='inset 2px 2px 10px gold';" onmouseout="if(!townpolon){document.getElementById('townpol').style.border='none'; document.getElementById('townpol').style.boxShadow='none';};" onclick="townpolon=true; this.style.border='1px solid yellow'; this.style.boxShadow='inset 2px 2px 10px gold'; townparon=false; townoboron=false; towneconon=false; document.getElementById('townpar').style.border='none'; document.getElementById('townpar').style.boxShadow='none'; document.getElementById('townobor').style.border='none'; document.getElementById('townobor').style.boxShadow='none'; document.getElementById('townecon').style.border='none'; document.getElementById('townecon').style.boxShadow='none'; ">Политика</div>
+		<div id="townobor"  class="acrylic shadow" style="border-radius: 5px 5px 0 0; padding: 0; height: 16px; width: 70px;" onmouseover="this.style.border='1px solid yellow'; this.style.boxShadow='inset 2px 2px 10px gold';" onmouseout="if(!townoboron){document.getElementById('townobor').style.border='none'; document.getElementById('townobor').style.boxShadow='none';};" onclick="townoboron=true; this.style.border='1px solid yellow'; this.style.boxShadow='inset 2px 2px 10px gold'; townparon=false; townpolon=false; towneconon=false; document.getElementById('townpar').style.border='none'; document.getElementById('townpar').style.boxShadow='none'; document.getElementById('townpol').style.border='none'; document.getElementById('townpol').style.boxShadow='none'; document.getElementById('townecon').style.border='none'; document.getElementById('townecon').style.boxShadow='none';  ">Оборона</div>
+		<div id="townecon"  class="acrylic shadow" style="border-radius: 5px 5px 0 0; padding: 0; height: 16px; width: 70px;" onmouseover="this.style.border='1px solid yellow'; this.style.boxShadow='inset 2px 2px 10px gold';" onmouseout="if(!towneconon){document.getElementById('townecon').style.border='none'; document.getElementById('townecon').style.boxShadow='none';};" onclick="towneconon=true; this.style.border='1px solid yellow'; this.style.boxShadow='inset 2px 2px 10px gold'; townparon=false; townpolon=false; townoboron=false; document.getElementById('townpar').style.border='none'; document.getElementById('townpar').style.boxShadow='none'; document.getElementById('townpol').style.border='none'; document.getElementById('townpol').style.boxShadow='none'; document.getElementById('townobor').style.border='none'; document.getElementById('townobor').style.boxShadow='none';">Экономика</div>
+		<div></div>
+	</div>
+
+	<div class="closer" style="display: fixed;" onclick="document.getElementById('townmenu').style.display='none'; document.getElementById('resoursesmenu').style.display='none'; document.getElementById('buildingsmenu').style.display='none'; document.getElementById('buildermenu').style.display='none';	document.getElementById('bdmname').style.display='none'; document.getElementById('rmname').style.display='none'; document.getElementById('bmname').style.display='none';"></div>
+
+	<div id="townsmenu" style="display: block; text-align: center;">
+
+		<div class="acrylic shadow tmgrid">
+		<div onmouseover="alter('размер селения')" onmouseout="document.getElementById('alter').style.display='none';">Ранг:</div><div id="townrang">_</div><div></div>
+		</div>
+		<div class="acrylic shadow tmgrid">
+		<div onmouseover="alter('удовлетверенность нуждами населения')" onmouseout="document.getElementById('alter').style.display='none';">Благополучие:</div><div id="townblag">_</div>
+
+		<div id="townblag+"><div class="acrylic shadow but1" onmouseover="alter('ввести праздники')" onmouseout="document.getElementById('alter').style.display='none';">+</div></div>
+		</div>
+		<div class="acrylic shadow tmgrid">
+		<div onmouseover="alter('размер поселения в количестве зданий')" onmouseout="document.getElementById('alter').style.display='none';">Расширение:</div><div id="townras">_</div><div></div>
+		</div>
+
+		<div class="acrylic shadow tmgrid">
+		<div onmouseover="alter('показатель организованности труда местного населения')" onmouseout="document.getElementById('alter').style.display='none';">Oрганизация:</div><div id="townorg">_</div>
+		<div><div class="acrylic shadow but1" id="townorg+" onmouseover="alter('поощрать население')" onmouseout="document.getElementById('alter').style.display='none';">+</div></div>
+
+		<div onmouseover="alter('радиус освоения близлежащих территорий')" onmouseout="document.getElementById('alter').style.display='none';">Територии:</div><div id="townter">_</div>
+		<div><div class="acrylic shadow but1" id="townter+" onmouseover="alter('способствовать расширению пределов осваеваемой территории')" onmouseout="document.getElementById('alter').style.display='none';">+</div></div>
+
+		<div onmouseover="alter('инфраструктура на близлежащих территориях')" onmouseout="document.getElementById('alter').style.display='none';">Инфраструктура:</div><div id="towninfr">_</div><div></div>
+		
+		<div onmouseover="alter('затраты очков общества и власти на администрацию зданий и территорий селения')" onmouseout="document.getElementById('alter').style.display='none';">Администрирование:</div><div id="townadm">_</div><div></div>
+		</div>
+
+		<div class="acrylic shadow tmgrid">
+		<div onmouseover="alter('доступ к водным ресурсам, увеличивают колодцы, водосборники, система каналов, и акведуки')" onmouseout="document.getElementById('alter').style.display='none';">Вода:</div><div id="townwat">_</div><div></div>
+		<div onmouseover="alter('производство пищи зданиями селения,  , и хранение в амбарах, зернохранилищах')" onmouseout="document.getElementById('alter').style.display='none';">Продовольствие:</div><div id="townprod">_</div><div></div>
+		</div>
+
+		<div class="acrylic shadow tmgrid">
+		<div onmouseover="alter('сколько проживает населения в селении')" onmouseout="document.getElementById('alter').style.display='none';">Население:</div><div id="townnas">_</div><div></div>
+		<div onmouseover="alter('рост населения')">Рост:</div><div id="townrost" onmouseout="document.getElementById('alter').style.display='none';">_</div><div></div>
+		</div>
+
+		<div class="acrylic shadow tmgrid">
+		<div onmouseover="alter('рождаемость у населения')" onmouseout="document.getElementById('alter').style.display='none';">Рождаемость:</div><div id="townroj">_</div>
+		<div><div class="acrylic shadow but1" id="townroj+" onmouseover="alter('поддерживать многодетные семьи')" onmouseout="document.getElementById('alter').style.display='none';">+</div></div>
+		
+		<div onmouseover="alter('смертность у населения')" onmouseout="document.getElementById('alter').style.display='none';">Смертность:</div><div id="townsme">_</div>
+		<div><div class="acrylic shadow but1" id="townsme+" onmouseover="alter('выслать лекарей')" onmouseout="document.getElementById('alter').style.display='none';">-</div></div>
+
+		<div onmouseover="alter('пополнение жителями с близлежащих террриторий, увеличивает благополучие, инфраструктура и освоение территорий')" onmouseout="document.getElementById('alter').style.display='none';">Иммиграция:</div><div id="townim">_</div>
+		<div><div class="acrylic shadow but1" id="townim+" onmouseover="alter('привлекать новых жителей')" onmouseout="document.getElementById('alter').style.display='none';">+</div></div>
+		
+		<div onmouseover="alter('сколько жителей мечтают о лучшей жизни в других краях')" onmouseout="document.getElementById('alter').style.display='none';">Эммиграция:</div><div id="townem">_</div>
+		<div><div class="acrylic shadow but1" id="townem+" onmouseover="alter('дать гарантии о лучшей жизни')" onmouseout="document.getElementById('alter').style.display='none';">-</div></div>
+		</div>
+
+		<div  class="acrylic shadow tmgrid">
+		<div onmouseover="alter('ресурс труда местных жителей над плановыми работами, ведь свое время они тратят над трудом в имеющихся зданиях, увеличивает населенность и организация, мастерские и фабрики')" onmouseout="document.getElementById('alter').style.display='none';">Человекочасы:</div><div id="townchel">_</div>
+		<div><div class="acrylic shadow but1" id="townchel+" onmouseover="alter('привлечь наемных работников')" onmouseout="document.getElementById('alter').style.display='none';">+</div></div>
+		
+		<div onmouseover="alter('местный бюджет, зависит от местной экономики')">Бюджет:</div><div id="townbudj" onmouseout="document.getElementById('alter').style.display='none';">_</div>
+		<div><div class="acrylic shadow but1" id="townbudj+" onmouseover="alter('сделать дотацию')" onmouseout="document.getElementById('alter').style.display='none';">+</div></div>
+		</div>
+
+		<div class="acrylic shadow tmgrid">
+		<div onmouseover="alter('показатель автономности селения, чем больше - тем больше затрат у центральной власти на действия в селении')" onmouseout="document.getElementById('alter').style.display='none';">Автономность:</div><div id="townav">_</div>
+		<div><div class="acrylic shadow but1" id="townav+" onmouseover="alter('укрепить центральную власть')" onmouseout="document.getElementById('alter').style.display='none';">-</div></div>
+		
+		<div onmouseover="alter('налоги, которые платит население')" onmouseout="document.getElementById('alter').style.display='none';">Налоги:</div><div id="townnal">_</div><div>
+		<div class="acrylic shadow but1" id="townnal-" onmouseover="alter('снизить налоги')" onmouseout="document.getElementById('alter').style.display='none';">-</div>
+		<div class="acrylic shadow but1" id="townnal+" onmouseover="alter('повысить налоги')" onmouseout="document.getElementById('alter').style.display='none';">+</div></div>
+		</div>
+
+		<div class="acrylic shadow" style="margin-top: 5px;" id="townrash">
+		Расширить
+		</div>
+
+
+</div>
+
+</div>
+
+
+<div id="rmname" class="counter3 acrylic shadow">Ресурсы</div>
+
+<div id="resoursesmenu" style="background: #8193a3;">
+<div style="display: grid; grid-template-columns: 30px 30px 30px 30px 30px 30px; grid-auto-rows: 28px; padding: 0; grid-row-gap: 5px; opacity: 0.82;">
+	
+
+	<div class="acrylic shadow rbgrid" id="r1"><div id="re1" class="counter acrylic shadow"></div>
+	<div id="res1" class="counter2 acrylic shadow"></div></div>
+	<div class="acrylic shadow rbgrid" id="r2"><div id="re2" class="counter acrylic shadow"></div>
+	<div id="res2" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r3"><div id="re3" class="counter acrylic shadow"></div>
+	<div id="res3" class="counter2 acrylic shadow"></div></div> 
+	<div class="acrylic shadow rbgrid" id="r4"><div id="re4" class="counter acrylic shadow"></div>
+	<div id="res4" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r5"><div id="re5" class="counter acrylic shadow"></div>
+	<div id="res5" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r6"><div id="re6" class="counter acrylic shadow"></div>
+	<div id="res6" class="counter2 acrylic shadow"></div></div> 
+	<div class="acrylic shadow rbgrid" id="r7"><div id="re7" class="counter acrylic shadow"></div>
+	<div id="res7" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r8"><div id="re8" class="counter acrylic shadow"></div>
+	<div id="res8" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r9"><div id="re9" class="counter acrylic shadow"></div>
+	<div id="res9" class="counter2 acrylic shadow"></div></div> 
+	<div class="acrylic shadow rbgrid" id="r10"><div id="re10" class="counter acrylic shadow"></div>
+	<div id="res10" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid"  id="r11"><div id="re11" class="counter acrylic shadow"></div>
+	<div id="res11" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r12"><div id="re12" class="counter acrylic shadow"></div>
+	<div id="res12" class="counter2 acrylic shadow"></div></div> 
+	<div class="acrylic shadow rbgrid" id="r13"><div id="re13" class="counter acrylic shadow"></div>
+	<div id="res13" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r14"><div id="re14" class="counter acrylic shadow"></div>
+	<div id="res14" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r15"><div id="re15" class="counter acrylic shadow"></div>
+	<div id="res15" class="counter2 acrylic shadow"></div></div> 
+	<div></div><div></div><div></div>
+
+	<div class="acrylic shadow rbgrid" id="r16"><div id="re16" class="counter acrylic shadow"></div>
+	<div id="res16" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r17"><div id="re17" class="counter acrylic shadow"></div>
+	<div id="res17" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r18"><div id="re18" class="counter acrylic shadow"></div>
+	<div id="res18" class="counter2 acrylic shadow"></div></div> 
+	<div class="acrylic shadow rbgrid" id="r19"><div id="re19" class="counter acrylic shadow"></div>
+	<div id="res19" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r20"><div id="re20" class="counter acrylic shadow"></div>
+	<div id="res20" class="counter2 acrylic shadow"></div></div>  
+	<div></div> 
+
+	<div class="acrylic shadow rbgrid" id="r21"><div id="re21" class="counter acrylic shadow"></div>
+	<div id="res21" class="counter2 acrylic shadow"></div></div> 
+	<div class="acrylic shadow rbgrid" id="r22"><div id="re22" class="counter acrylic shadow"></div>
+	<div id="res22" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r23"><div id="re23" class="counter acrylic shadow"></div>
+	<div id="res23" class="counter2 acrylic shadow"></div></div> 
+	<div class="acrylic shadow rbgrid block1" id="r24"><div id="re24" style="display: none;" class="counter acrylic shadow">
+	<div id="res24" class="counter2 acrylic shadow" style="display: none;"></div></div>
+	</div>  
+	<div class="acrylic shadow rbgrid" id="r25"><div id="re25" class="counter acrylic shadow"></div>
+	<div id="res25" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid block1" id="r26"><div id="re26" class="counter acrylic shadow" style="display: none;"></div>
+	<div id="res26" class="counter2 acrylic shadow" style="display: none;"></div></div>
+	<div class="acrylic shadow rbgrid" id="r27"><div id="re27" class="counter acrylic shadow"></div>
+	<div id="res27" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r28"><div id="re28" class="counter acrylic shadow"></div>
+	<div id="res28" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid block1" id="r29"><div id="re29" class="counter acrylic shadow" style="display: none;"></div>
+	<div id="res29" class="counter2 acrylic shadow" style="display: none;"></div></div>
+	<div class="acrylic shadow rbgrid block1" id="r30"><div id="re30" class="counter acrylic shadow" style="display: none;"></div>
+	<div id="res30" class="counter2 acrylic shadow" style="display: none;"></div></div>   
+	<div class="acrylic shadow rbgrid block1" id="r31"><div id="re31" class="counter acrylic shadow" style="display: none;"></div>
+	<div id="res31" class="counter2 acrylic shadow" style="display: none;"></div></div>   
+	<div class="acrylic shadow rbgrid block1" id="r32"><div id="re32" class="counter acrylic shadow" style="display: none;"></div>
+	<div id="res32" class="counter2 acrylic shadow" style="display: none;"></div></div> 
+	<div class="acrylic shadow rbgrid block1" id="r33"><div id="re33" class="counter acrylic shadow" style="display: none;"></div>
+	<div id="res33" class="counter2 acrylic shadow" style="display: none;"></div></div>  
+	<div></div> <div></div> <div></div> <div></div> <div></div> 
+		
+	<div class="acrylic shadow rbgrid" id="r34"><div id="re34" class="counter acrylic shadow"></div>
+	<div id="res34" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r35"><div id="re35" class="counter acrylic shadow"></div>
+	<div id="res35" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r36"><div id="re36" class="counter acrylic shadow"></div>
+	<div id="res36" class="counter2 acrylic shadow"></div></div> 
+	<div class="acrylic shadow rbgrid" id="r37"><div id="re37" class="counter acrylic shadow"></div>
+	<div id="res37" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r38"><div id="re38" class="counter acrylic shadow"></div>
+	<div id="res38" class="counter2 acrylic shadow"></div></div>   
+	<div class="acrylic shadow rbgrid" id="r39"><div id="re39" class="counter acrylic shadow"></div>
+	<div id="res39" class="counter2 acrylic shadow"></div></div> 
+	<div class="acrylic shadow rbgrid" id="r40"><div id="re40" class="counter acrylic shadow"></div>
+	<div id="res40" class="counter2 acrylic shadow"></div></div> 
+	<div class="acrylic shadow rbgrid" id="r41"><div id="re41" class="counter acrylic shadow"></div>
+	<div id="res41" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r42"><div id="re42" class="counter acrylic shadow"></div>
+	<div id="res42" class="counter2 acrylic shadow"></div></div> 
+	<div class="acrylic shadow rbgrid" id="r43"><div id="re43" class="counter acrylic shadow"></div>
+	<div id="res43" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r44"><div id="re44" class="counter acrylic shadow"></div>
+	<div id="res44" class="counter2 acrylic shadow"></div></div>   
+	<div class="acrylic shadow rbgrid" id="r45"><div id="re45" class="counter acrylic shadow"></div>
+	<div id="res45" class="counter2 acrylic shadow"></div></div> 
+
+	<div class="acrylic shadow rbgrid" id="r46"><div id="re46" class="counter acrylic shadow"></div>
+	<div id="res46" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r47"><div id="re47" class="counter acrylic shadow"></div>
+	<div id="res47" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r48"><div id="re48" class="counter acrylic shadow"></div>
+	<div id="res48" class="counter2 acrylic shadow"></div></div> 
+	<div class="acrylic shadow rbgrid" id="r49"><div id="re49" class="counter acrylic shadow"></div>
+	<div id="res49" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r50"><div id="re50" class="counter acrylic shadow"></div>
+	<div id="res50" class="counter2 acrylic shadow"></div></div>  
+	<div></div> 
+
+	<div class="acrylic shadow rbgrid" id="r51"><div id="re51" class="counter acrylic shadow"></div>
+	<div id="res51" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r52"><div id="re52" class="counter acrylic shadow"></div>
+	<div id="res52" class="counter2 acrylic shadow"></div></div>  
+	<div class="acrylic shadow rbgrid" id="r53"><div id="re53" class="counter acrylic shadow"></div>
+	<div id="res53" class="counter2 acrylic shadow"></div></div> 
+	<div class="acrylic shadow rbgrid block1" id="r54"><div id="re54" class="counter acrylic shadow" style="display: none;"></div>
+	<div id="res54" class="counter2 acrylic shadow" style="display: none;"></div></div>  
+	<div class="acrylic shadow rbgrid block1" id="r55"><div id="re55" class="counter acrylic shadow" style="display: none;"></div>
+	<div id="res55" class="counter2 acrylic shadow" style="display: none;"></div></div>  
+	<div class="acrylic shadow rbgrid block1" id="r56"><div id="re56" class="counter acrylic shadow" style="display: none;"></div>
+	<div id="res56" class="counter2 acrylic shadow" style="display: none;"></div></div> 
+	<div class="acrylic shadow rbgrid block1" id="r57"><div id="re57" class="counter acrylic shadow" style="display: none;"></div>
+	<div id="res57" class="counter2 acrylic shadow" style="display: none;"></div></div>   
+	<div class="acrylic shadow rbgrid block1" id="r58"><div id="re58" class="counter acrylic shadow" style="display: none;"></div>
+	<div id="res58" class="counter2 acrylic shadow" style="display: none;"></div></div>   
+	<div class="acrylic shadow rbgrid block1" id="r59"><div id="re59" class="counter acrylic shadow" style="display: none;"></div>
+	<div id="res59" class="counter2 acrylic shadow" style="display: none;"></div></div> 
+	<div class="acrylic shadow rbgrid block1" id="r60"><div id="re60" class="counter acrylic shadow" style="display: none;"></div>
+	<div id="res60" class="counter2 acrylic shadow" style="display: none;"></div></div>  
+	<div class="acrylic shadow rbgrid block1" id="r61"><div id="re61" class="counter acrylic shadow" style="display: none;"></div>
+	<div id="res61" class="counter2 acrylic shadow" style="display: none;"></div></div>  
+	<div class="acrylic shadow rbgrid block1" id="r62"><div id="re62" class="counter acrylic shadow" style="display: none;"></div>
+	<div id="res62" class="counter2 acrylic shadow" style="display: none;"></div></div> 
+
+</div>
+</div>
+
+<script>
+document.getElementById("r1").addEventListener("mouseover", function(event){alter('рыба');});
+document.getElementById("r2").addEventListener("mouseover", function(event){alter('киты');});
+document.getElementById("r3").addEventListener("mouseover", function(event){alter('соль');});
+document.getElementById("r4").addEventListener("mouseover", function(event){alter('скот');});
+document.getElementById("r5").addEventListener("mouseover", function(event){alter('дичь');});
+document.getElementById("r6").addEventListener("mouseover", function(event){alter('мясо');});
+document.getElementById("r7").addEventListener("mouseover", function(event){alter('зерно');});
+document.getElementById("r8").addEventListener("mouseover", function(event){alter('рис');});
+document.getElementById("r9").addEventListener("mouseover", function(event){alter('хлеб');});
+document.getElementById("r10").addEventListener("mouseover", function(event){alter('фрукты');});
+document.getElementById("r11").addEventListener("mouseover", function(event){alter('овощи');});
+document.getElementById("r12").addEventListener("mouseover", function(event){alter('вино');});
+document.getElementById("r13").addEventListener("mouseover", function(event){alter('специи');});
+document.getElementById("r14").addEventListener("mouseover", function(event){alter('сахар');});
+document.getElementById("r15").addEventListener("mouseover", function(event){alter('чай');});
+document.getElementById("r16").addEventListener("mouseover", function(event){alter('древесина');});
+document.getElementById("r17").addEventListener("mouseover", function(event){alter('камень');});
+document.getElementById("r18").addEventListener("mouseover", function(event){alter('глина');});
+document.getElementById("r19").addEventListener("mouseover", function(event){alter('кирпичи');});
+document.getElementById("r20").addEventListener("mouseover", function(event){alter('бетон');});
+document.getElementById("r21").addEventListener("mouseover", function(event){alter('железо');});
+document.getElementById("r22").addEventListener("mouseover", function(event){alter('свинец');});
+document.getElementById("r23").addEventListener("mouseover", function(event){alter('медь');});
+document.getElementById("r24").addEventListener("mouseover", function(event){alter('сталь');});
+document.getElementById("r25").addEventListener("mouseover", function(event){alter('олово');});
+document.getElementById("r26").addEventListener("mouseover", function(event){alter('алюминий');});
+document.getElementById("r27").addEventListener("mouseover", function(event){alter('серебро');});
+document.getElementById("r28").addEventListener("mouseover", function(event){alter('золото');});
+document.getElementById("r29").addEventListener("mouseover", function(event){alter('ртуть');});
+document.getElementById("r30").addEventListener("mouseover", function(event){alter('хром');});
+document.getElementById("r31").addEventListener("mouseover", function(event){alter('титан');});
+document.getElementById("r32").addEventListener("mouseover", function(event){alter('вольфрам');});
+document.getElementById("r33").addEventListener("mouseover", function(event){alter('редкие металы');});
+document.getElementById("r34").addEventListener("mouseover", function(event){alter('шелк');});
+document.getElementById("r35").addEventListener("mouseover", function(event){alter('шерсть');});
+document.getElementById("r36").addEventListener("mouseover", function(event){alter('хлопок');});
+document.getElementById("r37").addEventListener("mouseover", function(event){alter('текстиль');});
+document.getElementById("r38").addEventListener("mouseover", function(event){alter('меха');});
+document.getElementById("r39").addEventListener("mouseover", function(event){alter('керамика');});
+document.getElementById("r40").addEventListener("mouseover", function(event){alter('благовония');});
+document.getElementById("r41").addEventListener("mouseover", function(event){alter('краски');});
+document.getElementById("r42").addEventListener("mouseover", function(event){alter('мрамор');});
+document.getElementById("r43").addEventListener("mouseover", function(event){alter('косметика');});
+document.getElementById("r44").addEventListener("mouseover", function(event){alter('парфюмерия');});
+document.getElementById("r45").addEventListener("mouseover", function(event){alter('гипс');});
+document.getElementById("r46").addEventListener("mouseover", function(event){alter('янтарь');});
+document.getElementById("r47").addEventListener("mouseover", function(event){alter('смола');});
+document.getElementById("r48").addEventListener("mouseover", function(event){alter('стекло');});
+document.getElementById("r49").addEventListener("mouseover", function(event){alter('драг камни');});
+document.getElementById("r50").addEventListener("mouseover", function(event){alter('украшения');});
+document.getElementById("r51").addEventListener("mouseover", function(event){alter('инструменты');});
+document.getElementById("r52").addEventListener("mouseover", function(event){alter('уголь');});
+document.getElementById("r53").addEventListener("mouseover", function(event){alter('лошади');});
+document.getElementById("r54").addEventListener("mouseover", function(event){alter('селитра');});
+document.getElementById("r55").addEventListener("mouseover", function(event){alter('нефть');});
+document.getElementById("r56").addEventListener("mouseover", function(event){alter('уран');});
+document.getElementById("r57").addEventListener("mouseover", function(event){alter('резина');});
+document.getElementById("r58").addEventListener("mouseover", function(event){alter('детали');});
+document.getElementById("r59").addEventListener("mouseover", function(event){alter('электроника');});
+document.getElementById("r60").addEventListener("mouseover", function(event){alter('аккамуляторы');});
+document.getElementById("r61").addEventListener("mouseover", function(event){alter('силикаты');});
+document.getElementById("r62").addEventListener("mouseover", function(event){alter('пластик');});
+</script>
+
+
+<div id="bmname" class="counter3 acrylic shadow">Здания</div>
+
+<div id="buildingsmenu" style="background: #8193a3;">
+
+<div style="display: grid; grid-template-columns: 65px 65px 35px 125px 125px 185px 125px 65px 125px 125px 125px 65px 185px; padding: 0; grid-row-gap: 5px;">
+
+<div style="display: grid; grid-template-columns: 30px 30px; grid-auto-rows: 28px; padding: 0; grid-row-gap: 5px; opacity: 0.5; border: 1px dashed white; " onmouseover="document.getElementById('bmname').innerHTML='Здания - тип';" onmouseout="document.getElementById('bmname').innerHTML='Здания';">
+<div class="acrylic shadow" id="b01"><div id="bu01" class="counter acrylic shadow"></div></div> <!-- соломенные -->
+<div class="acrylic shadow" id="b02"><div id="bu02" class="counter acrylic shadow"></div></div> <!-- деревянные -->
+<div class="acrylic shadow" id="b03"><div id="bu03" class="counter acrylic shadow"></div></div> <!-- каменные-->
+<div class="acrylic shadow block1" id="b04"><div id="bu04" class="counter acrylic shadow" style="display: none;"></div></div> <!-- кирпичные -->
+<div class="acrylic shadow block2" id="b05"><div id="bu05" class="counter acrylic shadow" style="display: none;"></div></div> <!-- бетонные -->
+<div class="acrylic shadow block2" id="b06"><div id="bu06" class="counter acrylic shadow" style="display: none;"></div></div> <!-- железобетонные -->
+</div>
+
+<div style="display: grid; grid-template-columns: 30px 30px; grid-auto-rows: 28px; padding: 0; grid-row-gap: 5px; opacity: 0.5; border: 1px dashed white;" onmouseover="document.getElementById('bmname').innerHTML='Здания - население';" onmouseout="document.getElementById('bmname').innerHTML='Здания';">
+<div class="acrylic shadow" id="b1_1"><div id="bu1_1" class="counter acrylic shadow"></div></div> <!-- трущебы -->
+<div class="acrylic shadow" id="b1_2"><div id="bu1_2" class="counter acrylic shadow"></div></div> <!-- жилища -->
+<div class="acrylic shadow" id="b1_3"><div id="bu1_3" class="counter acrylic shadow"></div></div> <!-- домашние хозяйства -->
+<div class="acrylic shadow  block1" id="b1_4"><div id="bu1_4" class="counter acrylic shadow" style="display: none;"></div></div> <!-- поместья -->
+<div></div><div></div>
+</div>
+
+<div style="display: grid; grid-template-columns: 30px; grid-auto-rows: 28px; padding: 0; grid-row-gap: 5px; opacity: 0.5; border: 1px dashed white;" onmouseover="document.getElementById('bmname').innerHTML='Здания - промышленность';" onmouseout="document.getElementById('bmname').innerHTML='Здания';">
+<div class="acrylic shadow" id="b2_1"><div id="bu2_1" class="counter acrylic shadow"></div></div> <!-- мастерская -->
+<div class="acrylic shadow block1" id="b2_2"><div id="bu2_2" class="counter acrylic shadow" style="display: none;"></div></div> <!-- фабрика -->
+<div class="acrylic shadow block2" id="b2_3"><div id="bu2_3" class="counter acrylic shadow" style="display: none;"></div></div> <!-- склады -->
+</div>
+
+<div style="display: grid; grid-template-columns: 30px 30px 30px 30px; grid-auto-rows: 28px; padding: 0; grid-row-gap: 5px; opacity: 0.5; border: 1px dashed white;" onmouseover="document.getElementById('bmname').innerHTML='Здания - администрация';" onmouseout="document.getElementById('bmname').innerHTML='Здания';">
+<div class="acrylic shadow block1" id="b3_1"><div id="bu3_1" class="counter acrylic shadow" style="display: none;"></div></div> <!-- посольство провинции -->
+<div class="acrylic shadow block1" id="b3_2"><div id="bu3_2" class="counter acrylic shadow" style="display: none;"></div></div> <!-- городская стража -->
+<div class="acrylic shadow block2" id="b3_3"><div id="bu3_3" class="counter acrylic shadow" style="display: none;"></div></div> <!-- суд -->
+<div class="acrylic shadow block2" id="b3_4"><div id="bu3_4" class="counter acrylic shadow" style="display: none;"></div></div> <!-- дворец -->
+<div class="acrylic shadow block2" id="b3_5"><div id="bu3_5" class="counter acrylic shadow" style="display: none;"></div></div> <!-- зал для приемов -->
+<div class="acrylic shadow block2" id="b3_6"><div id="bu3_6" class="counter acrylic shadow" style="display: none;"></div></div> <!-- канцелярия -->
+<div class="acrylic shadow block2" id="b3_7"><div id="bu3_7" class="counter acrylic shadow" style="display: none;"></div></div> <!-- консульство -->
+<div class="acrylic shadow block2" id="b3_8"><div id="bu3_8" class="counter acrylic shadow" style="display: none;"></div></div> <!-- министерство иностранных дел -->
+<div class="acrylic shadow block2" id="b3_9"><div id="bu3_9" class="counter acrylic shadow" style="display: none;"></div></div> <!-- штаб тайной службы -->
+<div class="acrylic shadow block2" id="b3_10"><div id="bu3_10" class="counter acrylic shadow" style="display: none;"></div></div><!-- дипломатический квартал -->
+<div></div><div></div>
+</div>
+
+<div style="display: grid; grid-template-columns: 30px 30px 30px 30px; grid-auto-rows: 28px; padding: 0; grid-row-gap: 5px; opacity: 0.5; border: 1px dashed white;" onmouseover="document.getElementById('bmname').innerHTML='Здания - продовольствие и вода';" onmouseout="document.getElementById('bmname').innerHTML='Здания';">
+<div class="acrylic shadow" id="b4_1"><div id="bu4_1" class="counter acrylic shadow"></div></div> <!-- амбар -->
+<div class="acrylic shadow" id="b4_2"><div id="bu4_2" class="counter acrylic shadow"></div></div> <!-- колодцы -->
+<div class="acrylic shadow" id="b4_3"><div id="bu4_3" class="counter acrylic shadow"></div></div> <!-- зернохранилище -->
+<div class="acrylic shadow block1" id="b4_4"><div id="bu4_4" class="counter acrylic shadow" style="display: none;"></div></div> <!-- мельница -->
+<div class="acrylic shadow block1" id="b4_5"><div id="bu4_5" class="counter acrylic shadow" style="display: none;"></div></div> <!-- водосборники -->
+<div class="acrylic shadow block1" id="b4_6"><div id="bu4_6" class="counter acrylic shadow" style="display: none;"></div></div> <!-- система каналов -->
+<div class="acrylic shadow block1" id="b4_7"><div id="bu4_7" class="counter acrylic shadow" style="display: none;"></div></div> <!-- продуктовый рынок -->
+<div class="acrylic shadow block2" id="b4_8"><div id="bu4_8" class="counter acrylic shadow" style="display: none;"></div></div> <!-- оросительные акведуки -->
+<div class="acrylic shadow block2" id="b4_9"><div id="bu4_9" class="counter acrylic shadow" style="display: none;"></div></div> <!-- городской акведук -->
+<div></div> 
+<div></div><div></div>
+</div>
+<div style="display: grid; grid-template-columns: 30px 30px 30px 30px 30px 30px; grid-auto-rows: 28px; padding: 0; grid-row-gap: 5px; opacity: 0.5; border: 1px dashed white;" onmouseover="document.getElementById('bmname').innerHTML='Здания - благополучие';" onmouseout="document.getElementById('bmname').innerHTML='Здания';">
+<div class="acrylic shadow block1" id="b5_1"><div id="bu5_1" class="counter acrylic shadow" style="display: none;"></div></div><!-- канализация -->
+<div class="acrylic shadow block1" id="b5_2"><div id="bu5_2" class="counter acrylic shadow" style="display: none;"></div></div><!-- бани -->
+<div class="acrylic shadow block1" id="b5_3"><div id="bu5_3" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b5_4"><div id="bu5_4" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b5_5"><div id="bu5_5" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b5_6"><div id="bu5_6" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b5_7"><div id="bu5_7" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b5_8"><div id="bu5_8" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b5_9"><div id="bu5_9" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b5_10"><div id="bu5_10" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b5_11"><div id="bu5_11" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b5_12"><div id="bu5_12" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b5_13"><div id="bu5_13" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b5_14"><div id="bu5_14" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b5_15"><div id="bu5_15" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b5_16"><div id="bu5_16" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b5_17"><div id="bu5_17" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b5_18"><div id="bu5_18" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+</div>
+<div style="display: grid; grid-template-columns: 30px 30px 30px 30px; grid-auto-rows: 28px; padding: 0; grid-row-gap: 5px; opacity: 0.5; border: 1px dashed white;" onmouseover="document.getElementById('bmname').innerHTML='Здания - культура';" onmouseout="document.getElementById('bmname').innerHTML='Здания';">
+<div class="acrylic shadow" id="b6_1"><div id="bu6_1" class="counter acrylic shadow"></div></div> <!--  -->
+<div class="acrylic shadow block1" id="b6_2"><div id="bu6_2" class="counter acrylic shadow" style="display: none;"></div></div><!--  --> 
+<div class="acrylic shadow block1" id="b6_3"><div id="bu6_3" class="counter acrylic shadow" style="display: none;"></div></div> <!--  -->
+<div class="acrylic shadow block1" id="b6_4"><div id="bu6_4" class="counter acrylic shadow" style="display: none;"></div></div> <!--  -->
+<div class="acrylic shadow block2" id="b6_5"><div id="bu6_5" class="counter acrylic shadow" style="display: none;"></div></div> <!--  -->
+<div class="acrylic shadow block2" id="b6_6"><div id="bu6_6" class="counter acrylic shadow" style="display: none;"></div></div> <!--  -->
+<div class="acrylic shadow block2" id="b6_7"><div id="bu6_7" class="counter acrylic shadow" style="display: none;"></div></div> <!--  -->
+<div class="acrylic shadow block2" id="b6_8"><div id="bu6_8" class="counter acrylic shadow" style="display: none;"></div></div> <!--  -->
+<div class="acrylic shadow block2" id="b6_9"><div id="bu6_9" class="counter acrylic shadow" style="display: none;"></div></div> <!--  -->
+<div class="acrylic shadow block3" id="b6_10"><div id="bu6_10" class="counter acrylic shadow" style="display: none;"></div></div> <!--  -->
+<div></div><div></div>
+</div>
+<div style="display: grid; grid-template-columns: 30px 30px; grid-auto-rows: 28px; padding: 0; grid-row-gap: 5px; opacity: 0.5; border: 1px dashed white;" onmouseover="document.getElementById('bmname').innerHTML='Здания - наука';" onmouseout="document.getElementById('bmname').innerHTML='Здания';">
+<div class="acrylic shadow block1" id="b7_1"><div id="bu7_1" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block1" id="b7_2"><div id="bu7_2" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b7_3"><div id="bu7_3" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b7_4"><div id="bu7_4" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b7_5"><div id="bu7_5" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b7_6"><div id="bu7_6" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+</div>
+<div style="display: grid; grid-template-columns: 30px 30px 30px 30px; grid-auto-rows: 28px; padding: 0; grid-row-gap: 5px; opacity: 0.5; border: 1px dashed white;" onmouseover="document.getElementById('bmname').innerHTML='Здания - инфраструктура';" onmouseout="document.getElementById('bmname').innerHTML='Здания';">
+<div class="acrylic shadow block1" id="b8_1"><div id="bu8_1" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block1" id="b8_2"><div id="bu8_2" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block1" id="b8_3"><div id="bu8_3" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b8_4"><div id="bu8_4" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b8_5"><div id="bu8_5" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b8_6"><div id="bu8_6" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b8_7"><div id="bu8_7" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b8_8"><div id="bu8_8" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b8_9"><div id="bu8_9" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b8_10"><div id="bu8_10" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b8_11"><div id="bu8_11" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b8_12"><div id="bu8_12" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+</div>
+
+<div style="display: grid; grid-template-columns: 30px 30px 30px 30px; grid-auto-rows: 28px; padding: 0; grid-row-gap: 5px; opacity: 0.5; border: 1px dashed white;" onmouseover="document.getElementById('bmname').innerHTML='Здания - военные';" onmouseout="document.getElementById('bmname').innerHTML='Здания';">
+<div class="acrylic shadow block1" id="b9_1"><div id="bu9_1" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block1" id="b9_2"><div id="bu9_2" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block1" id="b9_3"><div id="bu9_3" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block1" id="b9_4"><div id="bu9_4" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block1" id="b9_5"><div id="bu9_5" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b9_6"><div id="bu9_6" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b9_7"><div id="bu9_7" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b9_8"><div id="bu9_8" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b9_9"><div id="bu9_9" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b9_10"><div id="bu9_10" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b9_11"><div id="bu9_11" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b9_12"><div id="bu9_12" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+</div>
+
+<div style="display: grid; grid-template-columns: 30px 30px 30px 30px; grid-auto-rows: 28px; padding: 0; grid-row-gap: 5px; opacity: 0.5; border: 1px dashed white;" onmouseover="document.getElementById('bmname').innerHTML='Здания - экономика';" onmouseout="document.getElementById('bmname').innerHTML='Здания';">
+<div class="acrylic shadow block1" id="b10_1"><div id="bu10_1" class="counter acrylic shadow" style="display: none;"></div></div> <!--  -->
+<div class="acrylic shadow block2" id="b10_2"><div id="bu10_2" class="counter acrylic shadow" style="display: none;"></div></div> <!--  -->
+<div class="acrylic shadow block2" id="b10_3"><div id="bu10_3" class="counter acrylic shadow" style="display: none;"></div></div> <!--  -->
+<div class="acrylic shadow block2" id="b10_4"><div id="bu10_4" class="counter acrylic shadow" style="display: none;"></div></div> <!--  -->
+<div class="acrylic shadow block2" id="b10_5"><div id="bu10_5" class="counter acrylic shadow" style="display: none;"></div></div> <!--  -->
+<div class="acrylic shadow block3" id="b10_6"><div id="bu10_6" class="counter acrylic shadow" style="display: none;"></div></div> <!--  -->
+<div class="acrylic shadow block3" id="b10_7"><div id="bu10_7" class="counter acrylic shadow" style="display: none;"></div></div> <!--  -->
+<div class="acrylic shadow block3" id="b10_8"><div id="bu10_8" class="counter acrylic shadow" style="display: none;"></div></div> <!--  -->
+<div class="acrylic shadow block3" id="b10_9"><div id="bu10_9" class="counter acrylic shadow" style="display: none;"></div></div> <!--  -->
+<div class="acrylic shadow block3" id="b10_10"><div id="bu10_10" class="counter acrylic shadow" style="display: none;"></div></div> <!--  -->
+<div></div><div></div></div>
+
+<div style="display: grid; grid-template-columns: 30px 30px; grid-auto-rows: 28px; padding: 0; grid-row-gap: 5px; opacity: 0.5; border: 1px dashed white;" onmouseover="document.getElementById('bmname').innerHTML='Здания - расширение';" onmouseout="document.getElementById('bmname').innerHTML='Здания';">
+<div class="acrylic shadow block1" id="b11_1"><div id="bu11_1" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b11_2"><div id="bu11_2" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b11_3"><div id="bu11_3" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block2" id="b11_4"><div id="bu11_4" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+ <div></div><div></div>
+</div>
+<div style="display: grid; grid-template-columns: 30px 30px 30px 30px 30px 30px; grid-auto-rows: 28px; padding: 0; grid-row-gap: 5px; opacity: 0.5; border: 1px dashed white;" onmouseover="document.getElementById('bmname').innerHTML='Здания - производство';" onmouseout="document.getElementById('bmname').innerHTML='Здания';">
+<div class="acrylic shadow" id="b12_1"><div id="bu12_1" class="counter acrylic shadow"></div></div><!--  -->
+<div class="acrylic shadow" id="b12_2"><div id="bu12_2" class="counter acrylic shadow"></div></div><!--  -->
+<div class="acrylic shadow" id="b12_3"><div id="bu12_3" class="counter acrylic shadow"></div></div><!--  -->
+<div class="acrylic shadow" id="b12_4"><div id="bu12_4" class="counter acrylic shadow"></div></div><!--  -->
+<div class="acrylic shadow" id="b12_5"><div id="bu12_5" class="counter acrylic shadow"></div></div><!--  -->
+<div class="acrylic shadow" id="b12_6"><div id="bu12_6" class="counter acrylic shadow"></div></div><!--  -->
+<div class="acrylic shadow" id="b12_7"><div id="bu12_7" class="counter acrylic shadow"></div></div><!--  -->
+<div class="acrylic shadow" id="b12_8"><div id="bu12_8" class="counter acrylic shadow"></div></div><!--  -->
+<div class="acrylic shadow" id="b12_9"><div id="bu12_9" class="counter acrylic shadow"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b12_10"><div id="bu12_10" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b12_11"><div id="bu12_11" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b12_12"><div id="bu12_12" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b12_13"><div id="bu12_13" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b12_14"><div id="bu12_14" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+<div class="acrylic shadow block3" id="b12_15"><div id="bu12_15" class="counter acrylic shadow" style="display: none;"></div></div><!--  -->
+</div>
+
+
+
+<script>
+document.getElementById("b01").addEventListener("mouseover", function(event){alter('из соломы');});
+document.getElementById("b02").addEventListener("mouseover", function(event){alter('из дерева');});
+document.getElementById("b03").addEventListener("mouseover", function(event){alter('каменные');});
+document.getElementById("b04").addEventListener("mouseover", function(event){alter('кирпичные');});
+document.getElementById("b05").addEventListener("mouseover", function(event){alter('из бетона');});
+document.getElementById("b06").addEventListener("mouseover", function(event){alter('из железобетона');});
+
+document.getElementById("b1_1").addEventListener("mouseover", function(event){alter('трущебы');});
+document.getElementById("b1_2").addEventListener("mouseover", function(event){alter('жилища');});
+document.getElementById("b1_3").addEventListener("mouseover", function(event){alter('домашние хозяйства');});
+document.getElementById("b1_4").addEventListener("mouseover", function(event){alter('поместья');});
+
+document.getElementById("b2_1").addEventListener("mouseover", function(event){alter('мастерская');});
+document.getElementById("b2_2").addEventListener("mouseover", function(event){alter('склады');});
+document.getElementById("b2_3").addEventListener("mouseover", function(event){alter('фабрика');});
+
+document.getElementById("b3_1").addEventListener("mouseover", function(event){alter('посольлство провинции');});
+document.getElementById("b3_2").addEventListener("mouseover", function(event){alter('городская стража');});
+document.getElementById("b3_3").addEventListener("mouseover", function(event){alter('суд');});
+document.getElementById("b3_4").addEventListener("mouseover", function(event){alter('дворец');});
+document.getElementById("b3_5").addEventListener("mouseover", function(event){alter('зал для приемов');});
+document.getElementById("b3_6").addEventListener("mouseover", function(event){alter('канцелярия');});
+document.getElementById("b3_7").addEventListener("mouseover", function(event){alter('консульство');});
+document.getElementById("b3_8").addEventListener("mouseover", function(event){alter('министерство иностранных дел');});
+document.getElementById("b3_9").addEventListener("mouseover", function(event){alter('штаб тайной службы');});
+document.getElementById("b3_10").addEventListener("mouseover", function(event){alter('дипломатический квартал');});
+
+document.getElementById("b4_1").addEventListener("mouseover", function(event){alter('амбар');});
+document.getElementById("b4_2").addEventListener("mouseover", function(event){alter('колодцы');});
+document.getElementById("b4_3").addEventListener("mouseover", function(event){alter('зернохранилище');});
+document.getElementById("b4_4").addEventListener("mouseover", function(event){alter('мельница');});
+document.getElementById("b4_5").addEventListener("mouseover", function(event){alter('водосборники');});
+document.getElementById("b4_6").addEventListener("mouseover", function(event){alter('система каналов');});
+document.getElementById("b4_7").addEventListener("mouseover", function(event){alter('продуктовый рынок');});
+document.getElementById("b4_8").addEventListener("mouseover", function(event){alter('оросительные акведуки');});
+document.getElementById("b4_9").addEventListener("mouseover", function(event){alter('городской акведук');});
+
+document.getElementById("b5_1").addEventListener("mouseover", function(event){alter('канализация');});
+document.getElementById("b5_2").addEventListener("mouseover", function(event){alter('бани');});
+document.getElementById("b5_3").addEventListener("mouseover", function(event){alter('лекарь');});
+document.getElementById("b5_4").addEventListener("mouseover", function(event){alter('фонтаны');});
+document.getElementById("b5_5").addEventListener("mouseover", function(event){alter('цирк');});
+document.getElementById("b5_6").addEventListener("mouseover", function(event){alter('сады');});
+document.getElementById("b5_7").addEventListener("mouseover", function(event){alter('развлекательный комплекс');});
+document.getElementById("b5_8").addEventListener("mouseover", function(event){alter('госпиталь');});
+document.getElementById("b5_9").addEventListener("mouseover", function(event){alter('аквариум');});
+document.getElementById("b5_10").addEventListener("mouseover", function(event){alter('зоопарк');});
+document.getElementById("b5_11").addEventListener("mouseover", function(event){alter('киностудия');});
+document.getElementById("b5_12").addEventListener("mouseover", function(event){alter('колесо обозрения');});
+document.getElementById("b5_13").addEventListener("mouseover", function(event){alter('курорт');});
+document.getElementById("b5_14").addEventListener("mouseover", function(event){alter('система отопления');});
+document.getElementById("b5_15").addEventListener("mouseover", function(event){alter('водопроводы');});
+document.getElementById("b5_16").addEventListener("mouseover", function(event){alter('газопроводы');});
+document.getElementById("b5_17").addEventListener("mouseover", function(event){alter('электропроводки');});
+document.getElementById("b5_18").addEventListener("mouseover", function(event){alter('телефонные сети');});
+
+document.getElementById("b6_1").addEventListener("mouseover", function(event){alter('святилища');});
+document.getElementById("b6_2").addEventListener("mouseover", function(event){alter('храм');});
+document.getElementById("b6_3").addEventListener("mouseover", function(event){alter('театр');});
+document.getElementById("b6_4").addEventListener("mouseover", function(event){alter('памятники');});
+document.getElementById("b6_5").addEventListener("mouseover", function(event){alter('ипподром');});
+document.getElementById("b6_6").addEventListener("mouseover", function(event){alter('музей');});
+document.getElementById("b6_7").addEventListener("mouseover", function(event){alter('стадион');});
+document.getElementById("b6_8").addEventListener("mouseover", function(event){alter('арена');});
+document.getElementById("b6_9").addEventListener("mouseover", function(event){alter('храмовый комплекс');});
+document.getElementById("b6_10").addEventListener("mouseover", function(event){alter('центр вещания');});
+
+document.getElementById("b7_1").addEventListener("mouseover", function(event){alter('школа');});
+document.getElementById("b7_2").addEventListener("mouseover", function(event){alter('библиотека');});
+document.getElementById("b7_3").addEventListener("mouseover", function(event){alter('обсерватория');});
+document.getElementById("b7_4").addEventListener("mouseover", function(event){alter('университет');});
+document.getElementById("b7_5").addEventListener("mouseover", function(event){alter('лаборатории');});
+document.getElementById("b7_6").addEventListener("mouseover", function(event){alter('академия');});
+
+document.getElementById("b8_1").addEventListener("mouseover", function(event){alter('охраняемые дороги');});
+document.getElementById("b8_2").addEventListener("mouseover", function(event){alter('речные пристани');});
+document.getElementById("b8_3").addEventListener("mouseover", function(event){alter('ангар');});
+document.getElementById("b8_4").addEventListener("mouseover", function(event){alter('широкие дороги');});
+document.getElementById("b8_5").addEventListener("mouseover", function(event){alter('мощенные дороги');});
+document.getElementById("b8_6").addEventListener("mouseover", function(event){alter('тоннель');});
+document.getElementById("b8_7").addEventListener("mouseover", function(event){alter('аэропорт');});
+document.getElementById("b8_8").addEventListener("mouseover", function(event){alter('пусковая шахта');});
+document.getElementById("b8_9").addEventListener("mouseover", function(event){alter('железная дорога');});
+document.getElementById("b8_10").addEventListener("mouseover", function(event){alter('вокзал');});
+document.getElementById("b8_11").addEventListener("mouseover", function(event){alter('трамвайная сеть');});
+document.getElementById("b8_12").addEventListener("mouseover", function(event){alter('космопорт');});
+
+document.getElementById("b9_1").addEventListener("mouseover", function(event){alter('укрпеления');});
+document.getElementById("b9_2").addEventListener("mouseover", function(event){alter('казармы');});
+document.getElementById("b9_3").addEventListener("mouseover", function(event){alter('конюшни');});
+document.getElementById("b9_4").addEventListener("mouseover", function(event){alter('военная мастерская');});
+document.getElementById("b9_5").addEventListener("mouseover", function(event){alter('стрельбище');});
+document.getElementById("b9_6").addEventListener("mouseover", function(event){alter('плац');});
+document.getElementById("b9_7").addEventListener("mouseover", function(event){alter('оружейная');});
+document.getElementById("b9_8").addEventListener("mouseover", function(event){alter('военный лекарь');});
+document.getElementById("b9_9").addEventListener("mouseover", function(event){alter('военное ведомство');});
+document.getElementById("b9_10").addEventListener("mouseover", function(event){alter('стены');});
+document.getElementById("b9_11").addEventListener("mouseover", function(event){alter('военный госпиталь');});
+document.getElementById("b9_12").addEventListener("mouseover", function(event){alter('склад снабжения');});
+
+document.getElementById("b10_1").addEventListener("mouseover", function(event){alter('рынок');});
+document.getElementById("b10_2").addEventListener("mouseover", function(event){alter('налоговое управление');});
+document.getElementById("b10_3").addEventListener("mouseover", function(event){alter('монетный двор');});
+document.getElementById("b10_4").addEventListener("mouseover", function(event){alter('форум');});
+document.getElementById("b10_5").addEventListener("mouseover", function(event){alter('банк');});
+document.getElementById("b10_6").addEventListener("mouseover", function(event){alter('биржа');});
+document.getElementById("b10_7").addEventListener("mouseover", function(event){alter('торговый центр');});
+document.getElementById("b10_8").addEventListener("mouseover", function(event){alter('офисы');});
+document.getElementById("b10_9").addEventListener("mouseover", function(event){alter('офисный центр');});
+document.getElementById("b10_10").addEventListener("mouseover", function(event){alter('торговый комплекс');});
+
+document.getElementById("b11_1").addEventListener("mouseover", function(event){alter('плотина');});
+document.getElementById("b11_2").addEventListener("mouseover", function(event){alter('пригород');});
+document.getElementById("b11_3").addEventListener("mouseover", function(event){alter('колония');});
+document.getElementById("b11_4").addEventListener("mouseover", function(event){alter('военная колония');});
+
+document.getElementById("b12_1").addEventListener("mouseover", function(event){alter('поле');});
+document.getElementById("b12_2").addEventListener("mouseover", function(event){alter('пастбище');});
+document.getElementById("b12_3").addEventListener("mouseover", function(event){alter('плантация');});
+document.getElementById("b12_4").addEventListener("mouseover", function(event){alter('лагерь');});
+document.getElementById("b12_5").addEventListener("mouseover", function(event){alter('каменоломня');});
+document.getElementById("b12_6").addEventListener("mouseover", function(event){alter('шахта');});
+document.getElementById("b12_7").addEventListener("mouseover", function(event){alter('рудник');});
+document.getElementById("b12_8").addEventListener("mouseover", function(event){alter('карьер');});
+document.getElementById("b12_9").addEventListener("mouseover", function(event){alter('лесопилка');});
+document.getElementById("b12_10").addEventListener("mouseover", function(event){alter('гидроэлектростанция');});
+document.getElementById("b12_11").addEventListener("mouseover", function(event){alter('мазутная электростанция');});
+document.getElementById("b12_12").addEventListener("mouseover", function(event){alter('угольная электростанция');});
+document.getElementById("b12_13").addEventListener("mouseover", function(event){alter('буровая вышка');});
+document.getElementById("b12_14").addEventListener("mouseover", function(event){alter('солнечная электростанция');});
+document.getElementById("b12_15").addEventListener("mouseover", function(event){alter('геотермальная электростанция');});
+</script>
+
+</div>
+</div>
+
+<div id="bdmname" class="counter3 acrylic shadow">Строительство</div>
+<div id="buildermenu">
+
+</div>
+
+
+
+
+
+
+
+<div id="towns0pl"></div>
+<div id="towns1pl"></div>
+<div id="towns2pl"></div>
+<div id="towns3pl"></div>
+<div id="towns4pl"></div>
+<div id="towns5pl"></div>
+<div id="towns6pl"></div>
+<div id="towns7pl"></div>
+<div id="towns8pl"></div>
+<div id="towns9pl"></div>
+<div id="townstribes"></div>
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.0/jquery.min.js"></script>
+<script>
+let spawnplayers=[], tribes=[], tribescount, mintribes=10, maxtribes=100, countplayers, mincountplayers=4, maxcountplayers=10, townonclickj, townonclicki, ourparamstown=[], ourbuildings=[], ourparamsbuildings=[], buidingsname=[], ourparamstowngrowth=[];
+
+backgroundsplayers=["white","#7CB9E8","#C0E8D5","#B284BE","#F19CBB","#9F2B68","#3B7A57","#FFBF00","#A4C639","#CD9575"];
+countplayers=Math.floor(mincountplayers + Math.random() * (maxcountplayers + 1 - mincountplayers));
+
+			let bucost=[];
+            //random cto daet zdanie
+            bucost.push([],[],[],[],[],[],[],[],[],[],[],[]);
+			ourparamsbuildings.push([],[],[],[],[],[],[],[],[],[],[],[]);
+			buidingsname.push([],[],[],[],[],[],[],[],[],[],[],[]);
+
+			bucost[0].push(50,70,100,200);
+			ourparamsbuildings[0].push(10,20,10,0);   //na naselenie
+			buidingsname[0].push("трущебы","жилища","хозяйства","поместья");
+			//1 трущебы, 2 жилища, 3 домашние хозяйства
+			//4 поместья
+			ourparamsbuildings[1].push(20,0,0);   // na stritelstvo i proizvodstvo
+			buidingsname[1].push("мастерская","фабрика","склады");
+			//1 мастерская
+			//2 фабрика, 3 склады
+			ourparamsbuildings[2].push(0,0,0,0,0,0,0,0,0,0);     //na administratiu
+			buidingsname[2].push("посольство провинции","городская стража","суд","дворец","зал для приемов","канцелярия","консульство","министерство иностранных дел","штаб тайной службы","дипломатический квартал");
+			//
+			//1 посольлство провинции, 2 городская стража
+			//3 суд, 4 дворец, 5 зал для приемов, 6 канцелярия, 7 консульство, 8 министерство иностранных дел, 9 штаб тайной службы, 10 дипломатический квартал
+			ourparamsbuildings[3].push(20,20,10,0,0,0,0,0,0);  //na prodovolstvie i vodu
+			buidingsname[3].push("амбар","колодцы","зернохранилище","мельница","водосборники","система каналов","продуктовый рынок","оросительные акведуки","городской акведук");
+			//1 амбар, 2 колодцы, 3 зернохранилище
+			//4 мельница, 5 водосборники, 6 система каналов, 7 продуктовый рынок
+			//8 оросительные акведуки, 9 городской акведук
+			ourparamsbuildings[4].push(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0);    //na blagopolucie
+			buidingsname[4].push("канализация","бани","лекарь","фонтаны","цирк","сады","развлекательный комплекс","госпиталь","аквариум","зоопарк","киностудия","колесо обозрения","курорт","система отопления","водопроводы","газопроводы","электропроводки","телефонные сети");
+			//
+			//1 канализация, 2 бани, 3 лекарь
+			//4 фонтаны, 5 цирк, 6 сады, 7 развлекательный комплекс, 8 госпиталь
+			//9 аквариум, 10 зоопарк, 11 киностудия, 12 колесо обозрения, 13 курорт
+			//14 система отопления, 15 водопроводы, 16 газопроводы, 17 электропроводки, 18 телефонные сети
+			ourparamsbuildings[5].push(10,0,0,0,0,0,0,0,0,0);      //na culturu
+			buidingsname[5].push("святилища","храм","театр","памятники","иподром","музей","стадион","арена","храмовый комплекс","центр вещания");
+			//1 святилища
+			//2 храм, 3 театр, 4 памятники
+			//5 ипподром, 6 музей, 7 стадион, 8 арена, 9 храмовый комплекс
+			//10 центр вещания
+			ourparamsbuildings[6].push(0,0,0,0,0,0);  //na nauku
+			buidingsname[6].push("школа","библиотека","обсерватория","университет","лаборатории","академия");
+			//
+			//1 школа, 2 библиотека, 3 обсерватория
+			//4 университет, 5 лаборатории, 6 академия
+			ourparamsbuildings[7].push(0,0,0,0,0,0,0,0,0,0,0,0);  //na infrastructuru
+			buidingsname[7].push("охраняемые дороги","речные пристани","ангар","широкие дороги","мощенные дороги","тоннель","аэропорт","пусковая шахта","железная дорога","вокзал","трамваи","космопорт");
+			//
+			//1 охраняемые дороги, 2 речные пристани, 3 ангар
+			//4 широкие дороги, 5 мощенные дороги, 6 тоннель
+			//7 аэропорт, 8 пусковая шахта, 9 железная дорога, 10 вокзал, 11 трамвайная сеть, 12 космопорт
+			ourparamsbuildings[8].push(0,0,0,0,0,0,0,0,0,0,0,0);  //na voenku
+			buidingsname[8].push("укрпеления","казармы","конюшни","военная мастерская","стрельбище","плац","оружейная","военный лекарь","военное ведомство","стены","военный госпиталь","склад снабжения");
+			//
+			//1 укрпеления, 2 казармы, 3 конюшни, 4 военная мастерская, 5 стрельбище
+			//6 плац, 7 оружейная, 8 военный лекарь, 9 военное ведомство, 10 стены, 11 военный госпиталь, 12 склад снабжения
+			ourparamsbuildings[9].push(0,0,0,0,0,0,0,0,0,0);   //na torgovlu i economicu
+			buidingsname[9].push("рынок","налоговое управление","монетный двор","форум","банк","биржа","торговый центр","офисы","офисный центр","торговый комплекс");
+			//
+			//1 рынок
+			//2 налоговое управление, 3 монетный двор, 4 форум, 5 банк
+			//6 биржа, 7 торговый центр, 8 офисы, 9 офисный центр, 10 торговый комплекс
+			ourparamsbuildings[10].push(0,0,0,0);     //na rasshirenie
+			buidingsname[10].push("плотина","пригород","колония","военная колония");
+			//
+			//1 плотина
+			//2 пригород, 3 колония, 4 военная колония
+			ourparamsbuildings[11].push(20,10,20,10,0,0,0,0,0,0,0,0,0,0,0);  //na proizvodstvo
+			buidingsname[11].push("поле","пастбище","плантация","лагерь","каменоломня","шахта","рудник","карьер","лесопилка","гидроэлектростанция","мазутная электростанция","угольная электростанция", "буровая вышка", "солнечная электростанция", "геотермальная электростанция");
+			//1 поле, 2 пастбище, 3 плантация, 4 лагерь
+			//5 каменоломня, 6 шахта, 7 рудник, 8 карьер, 9 лесопилка
+			//10 гидроэлектростанция, 11 мазутная электростанция, 12 угольная электростанция, 13 буровая вышка, 14 солнечная электростанция, 15 геотермальная электростанция
+
+let builderar=[];
+let builderqar=[];
+let newbu,pminus,mminus,mplus,pplus,isplus=true;
+let fixedbu=[];
+
+
+let builderqing = function(i,u,buprog,butype,buname){
+	newbu = document.createElement("div");
+	newbu.setAttribute("id", i.toString()+"builderq"+u.toString());
+	newbu.classList.add("acrylic","shadow");
+
+	if (u==1){
+		newbu.setAttribute("style", "display: grid; grid-template-columns: 30px auto; grid-auto-rows: 26px; padding: 0; grid-row-gap: 5px; opacity: 0.82; font-size: x-small; text-align: center; opacity: 0.5; margin-top: 23px;");
+	} else {
+		newbu.setAttribute("style", "display: grid; grid-template-columns: 30px auto; grid-auto-rows: 26px; padding: 0; grid-row-gap: 5px; opacity: 0.82; font-size: x-small; text-align: center; opacity: 0.5; margin-top: 5px;");
+	}
+
+	
+	document.getElementById('buildermenu').appendChild(newbu);
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("id", i.toString()+"builderq"+u.toString()+"o");
+	newbu.classList.add("acrylic","shadow");
+	document.getElementById(i.toString()+"builderq"+u.toString()).appendChild(newbu);
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("id", i.toString()+"builderq"+u.toString()+"n");
+	newbu.classList.add("counter","acrylic","shadow");
+	newbu.innerHTML=ourbuildings[i][butype][buname]+"+1";
+	document.getElementById(i.toString()+"builderq"+u.toString()+"o").appendChild(newbu);
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("id", i.toString()+"builderq"+u.toString()+"p");
+	newbu.setAttribute("style", "display: grid; grid-auto-rows: 10px 10px; padding: 0; grid-row-gap: 5px;");
+	document.getElementById(i.toString()+"builderq"+u.toString()).appendChild(newbu);
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("id", i.toString()+"builderq"+u.toString()+"name");
+	newbu.classList.add("counter3","acrylic","shadow");
+	newbu.innerHTML=buidingsname[butype][buname];
+	document.getElementById(i.toString()+"builderq"+u.toString()+"p").appendChild(newbu);
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("id", i.toString()+"builderq"+u.toString()+"pr");
+	newbu.classList.add("counter3","acrylic","shadow");
+	prog1=buprog*100/bucost[butype][buname];
+	prog2=0;
+	prog3=100;
+	if (prog1+prog2>100){
+		newbu.setAttribute("style", "display: grid; grid-template-columns: "+prog1+"% auto "+0+"%; grid-auto-rows: 10px; padding: 0;");
+	} else {
+		newbu.setAttribute("style", "display: grid; grid-template-columns: "+prog1+"% "+prog2+"% "+prog3+"%; grid-auto-rows: 10px; padding: 0;");
+	}
+
+	document.getElementById(i.toString()+"builderq"+u.toString()+"p").appendChild(newbu);
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("style", "background-color: #2364A9;");
+	document.getElementById(i.toString()+"builderq"+u.toString()+"pr").appendChild(newbu);
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("style", "background-color: #73BFB7;");
+	document.getElementById(i.toString()+"builderq"+u.toString()+"pr").appendChild(newbu);
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("style", "background-color: #FEC701;");
+	document.getElementById(i.toString()+"builderq"+u.toString()+"pr").appendChild(newbu);
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("id", i.toString()+"builderq"+u.toString()+"done");
+	newbu.setAttribute("style", "grid-column-start: 1; grid-column-end: 4; margin-top: -10px;");
+	newbu.innerHTML="Готовность:"+prog1.toString()+"% (+"+prog2.toString()+"%) / "+prog3.toString()+"%";
+	document.getElementById(i.toString()+"builderq"+u.toString()+"pr").appendChild(newbu);
+}
+
+let bpclick = function(i,u){
+	if (builderar[i][0]>1) {
+		if (fixedbu[i].indexOf(u) === -1) {
+			fixedbu[i].push(u);
+		}
+		if(pplus === undefined) {
+			pplus=0;
+		}
+		if(pminus === undefined){
+			pminus=0;
+		}
+		if(pplus == 0) {
+			pplus=builderar[i][u][3]/10;
+		}
+		if(pminus == 0){
+			pminus=pplus/builderar[i][0];
+		}
+		for (j=1; j<=builderar[i][0]; j++){
+
+			if (j==u){
+				builderar[i][j][3]=builderar[i][j][3]+pplus;
+				prog1=builderar[i][j][2]*100/bucost[builderar[i][j][0]][builderar[i][j][1]],
+				prog2=builderar[i][j][3]*100/(bucost[builderar[i][j][0]][builderar[i][j][1]]),
+				prog3=100*(bucost[builderar[i][j][0]][builderar[i][j][1]]-builderar[i][j][2]-builderar[i][j][3])/bucost[builderar[i][j][0]][builderar[i][j][1]];
+
+				prog1=prog1.toFixed(2);
+				prog2=prog2.toFixed(2);
+				prog3=prog3.toFixed(2);
+
+				if (prog1+prog2>100){
+					document.getElementById(i.toString()+"builder"+j.toString()+"pr").setAttribute("style", "display: grid; grid-template-columns: "+prog1+"% auto "+0+"%; grid-auto-rows: 10px; padding: 0;");
+				} else {
+					document.getElementById(i.toString()+"builder"+j.toString()+"pr").setAttribute("style", "display: grid; grid-template-columns: "+prog1+"% "+prog2+"% "+prog3+"%; grid-auto-rows: 10px; padding: 0;");
+				}
+				document.getElementById(i.toString()+"builder"+j.toString()+"done").innerHTML="Готовность:"+prog1.toString()+"% (+"+prog2.toString()+"%) / "+prog3.toString()+"%";
+				}
+
+			if (fixedbu[i].indexOf(j)===-1){
+					console.log("minus ", pminus);
+					builderar[i][j][3]=builderar[i][j][3]-pminus;
+					prog1=builderar[i][j][2]*100/bucost[builderar[i][j][0]][builderar[i][j][1]],
+					prog2=100*builderar[i][j][3]/(bucost[builderar[i][j][0]][builderar[i][j][1]]),
+					prog3=100*(bucost[builderar[i][j][0]][builderar[i][j][1]]-builderar[i][j][2]-builderar[i][j][3])/bucost[builderar[i][j][0]][builderar[i][j][1]];
+
+					prog1=prog1.toFixed(2);
+					prog2=prog2.toFixed(2);
+					prog3=prog3.toFixed(2);
+
+					if (prog1+prog2>100){
+						document.getElementById(i.toString()+"builder"+j.toString()+"pr").setAttribute("style", "display: grid; grid-template-columns: "+prog1+"% auto "+0+"%; grid-auto-rows: 10px; padding: 0;");
+					} else {
+						document.getElementById(i.toString()+"builder"+j.toString()+"pr").setAttribute("style", "display: grid; grid-template-columns: "+prog1+"% "+prog2+"% "+prog3+"%; grid-auto-rows: 10px; padding: 0;");
+					}
+
+					document.getElementById(i.toString()+"builder"+j.toString()+"done").innerHTML="Готовность:"+prog1.toString()+"% (+"+prog2.toString()+"%) / "+prog3.toString()+"%";
+								
+			}
+		}
+	}
+}
+
+let bmclick = function(i,u){
+	if (builderar[i][0]>1) {
+		if (fixedbu[i].indexOf(u) === -1) {
+			fixedbu[i].push(u);
+		}
+		if(mminus === undefined) {
+			mminus=0;
+		}
+		if(mplus === undefined) {
+			mplus=0;
+		}
+		if(mminus ==0) {
+			mminus=builderar[i][u][3]/10;
+		}
+		if(mplus ==0) {
+			mplus=mminus/builderar[i][0];
+		}
+		for (j=1; j<=builderar[i][0]; j++){
+
+			if (j==u){
+				builderar[i][j][3]=builderar[i][j][3]-mminus;
+				prog1=builderar[i][j][2]*100/bucost[builderar[i][j][0]][builderar[i][j][1]],
+				prog2=builderar[i][j][3]*100/(bucost[builderar[i][j][0]][builderar[i][j][1]]),
+				prog3=100*(bucost[builderar[i][j][0]][builderar[i][j][1]]-builderar[i][j][2]-builderar[i][j][3])/bucost[builderar[i][j][0]][builderar[i][j][1]];
+
+				prog1=prog1.toFixed(2);
+				prog2=prog2.toFixed(2);
+				prog3=prog3.toFixed(2);
+
+				if (prog1+prog2>100){
+					document.getElementById(i.toString()+"builder"+j.toString()+"pr").setAttribute("style", "display: grid; grid-template-columns: "+prog1+"% auto "+0+"%; grid-auto-rows: 10px; padding: 0;");
+				} else {
+					document.getElementById(i.toString()+"builder"+j.toString()+"pr").setAttribute("style", "display: grid; grid-template-columns: "+prog1+"% "+prog2+"% "+prog3+"%; grid-auto-rows: 10px; padding: 0;");
+				}
+				document.getElementById(i.toString()+"builder"+j.toString()+"done").innerHTML="Готовность:"+prog1.toString()+"% (+"+prog2.toString()+"%) / "+prog3.toString()+"%";
+			}
+
+			if (fixedbu[i].indexOf(j)===-1){
+					console.log("plus ", pminus);
+					builderar[i][j][3]=builderar[i][j][3]+mplus;
+					prog1=builderar[i][j][2]*100/bucost[builderar[i][j][0]][builderar[i][j][1]],
+					prog2=100*builderar[i][j][3]/(bucost[builderar[i][j][0]][builderar[i][j][1]]),
+					prog3=100*(bucost[builderar[i][j][0]][builderar[i][j][1]]-builderar[i][j][2]-builderar[i][j][3])/bucost[builderar[i][j][0]][builderar[i][j][1]];
+
+					prog1=prog1.toFixed(2);
+					prog2=prog2.toFixed(2);
+					prog3=prog3.toFixed(2);
+
+					if (prog1+prog2>100){
+						document.getElementById(i.toString()+"builder"+j.toString()+"pr").setAttribute("style", "display: grid; grid-template-columns: "+prog1+"% auto "+0+"%; grid-auto-rows: 10px; padding: 0;");
+					} else {
+						document.getElementById(i.toString()+"builder"+j.toString()+"pr").setAttribute("style", "display: grid; grid-template-columns: "+prog1+"% "+prog2+"% "+prog3+"%; grid-auto-rows: 10px; padding: 0;");
+					}
+
+					document.getElementById(i.toString()+"builder"+j.toString()+"done").innerHTML="Готовность:"+prog1.toString()+"% (+"+prog2.toString()+"%) / "+prog3.toString()+"%";
+			}				
+		}
+	}
+}
+
+
+
+let buildering = function(i,u,buprog,butype,buname){
+	newbu = document.createElement("div");
+	newbu.setAttribute("id", i.toString()+"builder"+u.toString());
+	newbu.classList.add("acrylic","shadow");
+	newbu.setAttribute("style", "display: grid; grid-template-columns: 30px auto 30px 30px; grid-auto-rows: 26px; padding: 0; grid-row-gap: 5px; opacity: 0.82; font-size: x-small; text-align: center; opacity: 0.5; margin-top: 5px;");
+	document.getElementById('buildermenu').appendChild(newbu);
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("id", i.toString()+"builder"+u.toString()+"o");
+	newbu.classList.add("acrylic","shadow");
+	document.getElementById(i.toString()+"builder"+u.toString()).appendChild(newbu);
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("id", i.toString()+"builder"+u.toString()+"n");
+	newbu.classList.add("counter","acrylic","shadow");
+	document.getElementById(i.toString()+"builder"+u.toString()+"o").appendChild(newbu);
+	newbu.innerHTML=ourbuildings[i][butype][buname]+"+1";
+	
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("id", i.toString()+"builder"+u.toString()+"p");
+	newbu.setAttribute("style", "display: grid; grid-auto-rows: 10px 10px; padding: 0; grid-row-gap: 5px;");
+	document.getElementById(i.toString()+"builder"+u.toString()).appendChild(newbu);
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("id", i.toString()+"builder"+u.toString()+"name");
+	newbu.classList.add("counter3","acrylic","shadow");
+	newbu.innerHTML=buidingsname[butype][buname];
+	document.getElementById(i.toString()+"builder"+u.toString()+"p").appendChild(newbu);
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("id", i.toString()+"builder"+u.toString()+"pr");
+	newbu.classList.add("counter3","acrylic","shadow");
+	prog1=buprog*100/bucost[butype][buname];
+	prog2=ourparamstown[i][14]*100/(builderar[i][0]*bucost[butype][buname]);
+	prog3=100*(bucost[butype][buname]-buprog-builderar[i][u][3])/bucost[butype][buname];
+
+	prog1=prog1.toFixed(2);
+	prog2=prog2.toFixed(2);
+	prog3=prog3.toFixed(2);
+
+	if (prog1+prog2>100){
+		newbu.setAttribute("style", "display: grid; grid-template-columns: "+prog1+"% auto "+0+"%; grid-auto-rows: 10px; padding: 0;");
+	} else {
+		newbu.setAttribute("style", "display: grid; grid-template-columns: "+prog1+"% "+prog2+"% "+prog3+"%; grid-auto-rows: 10px; padding: 0;");
+	}
+
+	document.getElementById(i.toString()+"builder"+u.toString()+"p").appendChild(newbu);
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("style", "background-color: #2364A9;");
+	document.getElementById(i.toString()+"builder"+u.toString()+"pr").appendChild(newbu);
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("style", "background-color: #73BFB7;");
+	document.getElementById(i.toString()+"builder"+u.toString()+"pr").appendChild(newbu);
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("style", "background-color: #FEC701;");
+	document.getElementById(i.toString()+"builder"+u.toString()+"pr").appendChild(newbu);
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("id", i.toString()+"builder"+u.toString()+"done");
+	newbu.setAttribute("style", "grid-column-start: 1; grid-column-end: 4; margin-top: -10px;");
+	newbu.innerHTML="Готовность:"+prog1.toString()+"% (+"+prog2.toString()+"%) / "+prog3.toString()+"%";
+	document.getElementById(i.toString()+"builder"+u.toString()+"pr").appendChild(newbu);
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("id", i.toString()+"builder"+u.toString()+"+");
+	newbu.classList.add("acrylic","shadow");
+	newbu.innerHTML="+";
+	document.getElementById(i.toString()+"builder"+u.toString()).appendChild(newbu);
+
+	newbu.onmouseover=function(){
+			if (builderar[i][0]>1) {
+				alter('Задать больший приоритет строительства');
+			} else {
+				alter('Задать больший приоритет строительства невозможно');
+			}};
+		newbu.onmouseout=function(){document.getElementById("alter").style.display="none"};
+		newbu.onclick=function(){bpclick(i,u)};
+	
+
+	newbu = document.createElement("div");
+	newbu.setAttribute("id", i.toString()+"builder"+u.toString()+"-");
+	newbu.classList.add("acrylic","shadow");
+	newbu.innerHTML="-";
+	document.getElementById(i.toString()+"builder"+u.toString()).appendChild(newbu);
+
+
+		newbu.onmouseover=function(){
+			if (builderar[i][0]>1) {
+				alter('Задать меньший приоритет строительства');
+			} else {
+				alter('Задать меньший приоритет строительства невозможно');
+			}};
+		newbu.onmouseout=function(){document.getElementById("alter").style.display="none"};
+		newbu.onclick=function(){bmclick(i,u)};
+	
+
+}
+let builder = function(i,buprog,butype,buname){
+	let prog1,prog2,prog3;
+	if(builderar[i].length==0){
+		builderar[i].push(1);
+		builderar[i].push([butype,buname,buprog,ourparamstown[i][14]/builderar[i][0]]);
+		buildering(i,builderar[i][0],buprog,butype,buname);
+	} else {
+		if (builderar[i][0]>=1&&ourparamstown[i][14]*100/((builderar[i][0]+1)*bucost[butype][buname])<5)
+		{
+			if(builderqar[i].length==0){
+			builderqar[i].push(1);
+			} else {
+				builderqar[i][0]+=1;
+			}
+				builderqar[i].push([butype,buname,buprog,ourparamstown[i][14]/builderqar[i][0]]);
+
+				if (!document.getElementById("que"+i.toString())){
+					newbu = document.createElement("div");
+					newbu.setAttribute("id", "que"+i.toString());
+					newbu.classList.add("acrylic","shadow","counter3");
+					newbu.innerHTML="Очередь строительства";
+					newbu.setAttribute("style", "width: 311px; top: 18px; left: 5px;");
+					document.getElementById("buildermenu").appendChild(newbu);
+				}
+
+				builderqing(i,builderqar[i][0],buprog,butype,buname);
+			
+		} else {
+
+		builderar[i][0]+=1;
+
+		for (j=1; j<builderar[i][0]; j++){
+
+			builderar[i][j][3]=ourparamstown[i][14]/builderar[i][0];
+			prog1=builderar[i][j][2]*100/bucost[builderar[i][j][0]][builderar[i][j][1]],
+			prog2=ourparamstown[i][14]*100/(builderar[i][0]*bucost[builderar[i][j][0]][builderar[i][j][1]]),
+			prog3=100*(bucost[builderar[i][j][0]][builderar[i][j][1]]-builderar[i][j][2]-builderar[i][j][3])/bucost[builderar[i][j][0]][builderar[i][j][1]];
+
+			prog1=prog1.toFixed(2);
+			prog2=prog2.toFixed(2);
+			prog3=prog3.toFixed(2);
+
+
+			if (prog1+prog2>100){
+				document.getElementById(i.toString()+"builder"+j.toString()+"pr").setAttribute("style", "display: grid; grid-template-columns: "+prog1+"% auto "+0+"%; grid-auto-rows: 10px; padding: 0;");
+			} else {
+			document.getElementById(i.toString()+"builder"+j.toString()+"pr").setAttribute("style", "display: grid; grid-template-columns: "+prog1+"% "+prog2+"% "+prog3+"%; grid-auto-rows: 10px; padding: 0;");
+			}
+
+			document.getElementById(i.toString()+"builder"+j.toString()+"done").innerHTML="Готовность:"+prog1.toString()+"% (+"+prog2.toString()+"%) / "+prog3.toString()+"%";
+		}
+	builderar[i].push([butype,buname,buprog,ourparamstown[i][14]/builderar[i][0]]);
+
+	buildering(i,builderar[i][0],buprog,butype,buname);
+}
+}
+}
+
+let bunum,bun=[],ind=[],idxx,sbun=[],sbunum;
+
+let indexbu = function (n,arr){
+	idxx = arr.indexOf(n);
+	while (idxx != -1) {
+		ind.push(idxx);
+ 		idxx = arr.indexOf(n, idxx + 1);
+	}
+	idxx=ind.length;
+	ind.splice(0,ind.length);
+}
+
+for (j=0; j<countplayers;j++){
+	let mintownsstart=4, maxtownsstart=10, radiusspawntowns, centerspawntownsx, centerspawntownsy, townsstartcount;
+	townsstartcount=Math.floor(mintownsstart + Math.random() * (maxtownsstart + 1 - mintownsstart));
+	radiusspawntowns=Math.floor(50 + Math.random() * (500 + 1 - 50));
+	let cantertownswhilebreaker=true;
+
+	while(cantertownswhilebreaker){
+		centerspawntownsx=Math.floor(Math.random()*5001);
+		centerspawntownsy=Math.floor(Math.random()*5001);
+
+    	let pix = cncl.getImageData(centerspawntownsx, centerspawntownsy, 1, 1).data;
+    	let hex = "#" + ("000000" + rgbToHex(pix[0], pix[1], pix[2])).slice(-6);
+    	if (hex!=="#44447a"&&hex!=="#434379"&&hex!=="32f6666"&&hex!=="#336699"&&hex!=="#43437a"&&hex!=="#424278"&&hex!=="#434379") break;
+	}
+
+	spawnplayers.push([townsstartcount,radiusspawntowns,centerspawntownsx,centerspawntownsy]);
+
+	if (j==0) {
+		window.scroll(spawnplayers[0][2]-400,spawnplayers[0][3]-400); 
+	};
+
+	for (i=0; i<townsstartcount; i++){
+		let townx,towny,townswhilebreaker=true,newDiv,newdivid,town;
+		
+		while(townswhilebreaker){
+			townx=centerspawntownsx+Math.floor(Math.random()*(2*radiusspawntowns+1)-radiusspawntowns);
+			towny=centerspawntownsy+Math.floor(Math.random()*(2*radiusspawntowns+1)-radiusspawntowns);
+
+	    	let pix = cncl.getImageData(townx, towny, 1, 1).data;
+	    	let hex = "#" + ("000000" + rgbToHex(pix[0], pix[1], pix[2])).slice(-6);
+	    	if (hex!=="#44447a"&&hex!=="#434379"&&hex!=="32f6666"&&hex!=="#336699") break;
+		}
+
+		spawnplayers[j].push([townx,towny]);
+
+		newDiv = document.createElement("div");
+		let newsubdiv;
+		newDiv.className = "stojanka";
+		newdivid='town'+j.toString()+'_'+i.toString();
+		newDiv.setAttribute("id", newdivid);
+		newDiv.setAttribute("style", "box-shadow: 0 0 10px "+backgroundsplayers[j]+"; border: 2px "+backgroundsplayers[j]+" dashed; background-color: #9a7d69; display: grid; grid-template-columns: 2px 2px; grid-column-gap: 1px; grid-auto-rows: 1px; grid-row-gap: 1px;");
+		document.getElementById('towns'+j.toString()+'pl').appendChild(newDiv);
+		for (k=0; k<4; k++){
+			newsubdiv = document.createElement("div");
+			newsubdiv.setAttribute("style", "background-color: #978780; border: 1px solid grey;");
+			newDiv.appendChild(newsubdiv);
+		}
+
+		town=jQuery(document.getElementById(newdivid));
+		town.offset({top: spawnplayers[j][4+i][1], left: spawnplayers[j][4+i][0]});
+
+		newpDiv = document.createElement("div");
+		newpDiv.setAttribute("id", "p"+j.toString()+'_'+i.toString());
+		document.getElementById('towns'+j.toString()+'pl').appendChild(newpDiv);
+		newpDiv.setAttribute("style", "font-size: x-small; background: white; opacity: 0.82;");
+		if (j!=0){
+			newpDiv.classList.add("counter3", "acrylic", "shadow");
+			newpDiv.innerHTML="Cтоянка "+i+" игрока "+j;
+			townp=jQuery(newpDiv);
+			townp.offset({top: spawnplayers[j][4+i][1]+15, left: spawnplayers[j][4+i][0]-25});
+		}
+		
+
+		if (j==0) {
+
+			builderar.push([]);
+			builderqar.push([]);
+			fixedbu.push([]);
+            //random params
+			ourparamstown.push([]);
+			ourparamstowngrowth.push([]);
+			ourparamstowngrowth[i].push(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0);
+			//Math.floor(Math.random)*10
+
+			ourparamstown[i].push(Math.floor(Math.random()*3)+1); // 1 rang stojanki
+
+			newpDiv.classList.add("counter3", "acrylic", "shadow");
+			newpDiv.setAttribute("style", "border: 1px solid #404a68; background: white; opacity: 0.82;");
+			if (ourparamstown[i][0]==1){
+				newpDiv.innerHTML="Небольшая стоянка "+i;
+			} else if (ourparamstown[i][0]==2){
+				newpDiv.innerHTML="Средняя стоянка "+i;
+			} else {
+				newpDiv.innerHTML="Большая стоянка "+i;
+			}
+			townp=jQuery(newpDiv);
+			townp.offset({top: spawnplayers[j][4+i][1]+15, left: spawnplayers[j][4+i][0]-25});
+
+			ourparamstown[i].push(Math.floor(Math.random()*101)); //2 organizatia
+			ourparamstown[i].push(Math.floor(Math.random()*33*ourparamstown[i][0])); //3 osvoenie territorij
+			ourparamstown[i].push(0); //4 infrastructura
+
+			if (ourparamstown[i][0]==1){
+				bunum=Math.floor(Math.random()*5)+1;
+				sbunum=Math.floor(Math.random()*4)+1;
+			} else if (ourparamstown[i][0]==2){
+				bunum=Math.floor(Math.random()*6)+5;
+				sbunum=Math.floor(Math.random()*4)+4;
+			} else {
+				bunum=Math.floor(Math.random()*6)+10;
+				sbunum=Math.floor(Math.random()*4)+8;
+			}
+			for (l=0; l<bunum; l++){
+				bun.push(Math.floor(Math.random()*14)+1);
+			}
+			for (l=0; l<sbunum; l++){
+				sbun.push(Math.floor(Math.random()*3)+1);
+			}
+ 	
+
+//random zdania
+			ourbuildings.push([[],[],[],[],[],[],[],[],[],[],[],[]]);
+
+			ourbuildings[i][0].push(0,0,0,0);   //na naselenie
+			indexbu(1,sbun);
+			ourbuildings[i][0][0]=idxx;
+			indexbu(2,sbun);
+			ourbuildings[i][0][1]=idxx;
+			indexbu(3,sbun);
+			ourbuildings[i][0][2]=idxx;
+			sbun.splice(0,sbun.length);
+			//1 трущебы, 2 жилища, 3 домашние хозяйства
+			//4 поместья
+			ourbuildings[i][1].push(0,0,0);   // na stritelstvo i proizvodstvo
+			indexbu(1,bun);
+			ourbuildings[i][1][0]=idxx;
+			//1 мастерская
+			//2 фабрика, 3 склады
+			ourbuildings[i][2].push(0,0,0,0,0,0,0,0,0,0);     //na administratiu
+			//
+			//1 посольлство провинции, 2 городская стража
+			//3 суд, 4 дворец, 5 зал для приемов, 6 канцелярия, 7 консульство, 8 министерство иностранных дел, 9 штаб тайной службы, 10 дипломатический квартал
+			ourbuildings[i][3].push(0,0,0,0,0,0,0,0,0);  //na prodovolstvie i vodu
+			indexbu(2,bun);
+			ourbuildings[i][3][0]=idxx;
+			indexbu(3,bun);
+			ourbuildings[i][3][1]=idxx;
+			indexbu(4,bun);
+			ourbuildings[i][3][2]=idxx;
+			//1 амбар, 2 колодцы, 3 зернохранилище
+			//4 мельница, 5 водосборники, 6 система каналов, 7 продуктовый рынок
+			//8 оросительные акведуки, 9 городской акведук
+			ourbuildings[i][4].push(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0);    //na blagopolucie
+			//
+			//1 канализация, 2 бани, 3 лекарь
+			//4 фонтаны, 5 цирк, 6 сады, 7 развлекательный комплекс, 8 госпиталь
+			//9 аквариум, 10 зоопарк, 11 киностудия, 12 колесо обозрения, 13 курорт
+			//14 система отопления, 15 водопроводы, 16 газопроводы, 17 электропроводки, 18 телефонные сети
+			ourbuildings[i][5].push(0,0,0,0,0,0,0,0,0,0);      //na culturu
+			indexbu(5,bun);
+			ourbuildings[i][5][0]=idxx;
+			//1 святилища
+			//2 храм, 3 театр, 4 памятники
+			//5 ипподром, 6 музей, 7 стадион, 8 арена, 9 храмовый комплекс
+			//10 центр вещания
+			ourbuildings[i][6].push(0,0,0,0,0,0);  //na nauku
+			//
+			//1 школа, 2 библиотека, 3 обсерватория
+			//4 университет, 5 лаборатории, 6 академия
+			ourbuildings[i][7].push(0,0,0,0,0,0,0,0,0,0,0,0);  //na infrastructuru
+			//
+			//1 охраняемые дороги, 2 речные пристани, 3 ангар
+			//4 широкие дороги, 5 мощенные дороги, 6 тоннель
+			//7 аэропорт, 8 пусковая шахта, 9 железная дорога, 10 вокзал, 11 трамвайная сеть, 12 космопорт
+			ourbuildings[i][8].push(0,0,0,0,0,0,0,0,0,0,0,0);  //na voenku
+			//
+			//1 укрпеления, 2 казармы, 3 конюшни, 4 военная мастерская, 5 стрельбище
+			//6 плац, 7 оружейная, 8 военный лекарь, 9 военное ведомство, 10 стены, 11 военный госпиталь, 12 склад снабжения
+			ourbuildings[i][9].push(0,0,0,0,0,0,0,0,0,0);   //na torgovlu i economicu
+			//
+			//1 рынок
+			//2 налоговое управление, 3 монетный двор, 4 форум, 5 банк
+			//6 биржа, 7 торговый центр, 8 офисы, 9 офисный центр, 10 торговый комплекс
+			ourbuildings[i][10].push(0,0,0,0);     //na rasshirenie
+			//
+			//1 плотина
+			//2 пригород, 3 колония, 4 военная колония
+			ourbuildings[i][11].push(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0);  //na proizvodstvo
+			indexbu(6,bun);
+			ourbuildings[i][11][0]=idxx;
+			indexbu(7,bun);
+			ourbuildings[i][11][1]=idxx;
+			indexbu(8,bun);
+			ourbuildings[i][11][2]=idxx;
+			indexbu(9,bun);
+			ourbuildings[i][11][3]=idxx;
+			indexbu(10,bun);
+			ourbuildings[i][11][4]=idxx;
+			indexbu(11,bun);
+			ourbuildings[i][11][5]=idxx;
+			indexbu(12,bun);
+			ourbuildings[i][11][6]=idxx;
+			indexbu(13,bun);
+			ourbuildings[i][11][7]=idxx;
+			indexbu(14,bun);
+			ourbuildings[i][11][8]=idxx;
+			bun.splice(0,bun.length);
+			//1 поле, 2 пастбище, 3 плантация, 4 лагерь
+			//5 каменоломня, 6 шахта, 7 рудник, 8 карьер, 9 лесопилка
+			//10 гидроэлектростанция, 11 мазутная электростанция, 12 угольная электростанция, 13 буровая вышка, 14 солнечная электростанция, 15 геотермальная электростанция
+
+
+			let buildingsnumber=0;
+			for (ii=0; ii<ourbuildings[i].lenght; ii++){
+				for (iii=0; iii<ourbuildings[i][ii].lenght; iii++){
+					buildingsnumber+=ourbuildings[i][ii][iii];
+				}
+			}
+			ourparamstown[i].push(Math.floor(Math.random()*11)+2*(buildingsnumber)+ourparamstown[i][2]/10); //5 administrirovanie
+
+			ourparamstown[i].push(ourbuildings[i][0][0]*ourparamsbuildings[0][0]+ourbuildings[i][0][1]*ourparamsbuildings[0][1]+ourbuildings[i][0][2]*ourparamsbuildings[0][2]+ourbuildings[i][0][3]*ourparamsbuildings[0][3]); //6 naselenie
+			ourparamstown[i].push(Math.floor(Math.random()*ourparamstown[i][5])); //7 rojdaemost
+			ourparamstown[i].push(Math.floor(Math.random()*ourparamstown[i][5])); //8 smertnost
+			let waterin=ourparamstown[i][2]*ourparamstown[i][2],waterinx=ourparamstown[i][2]/2,wateriny=ourparamstown[i][2]/2,waterinpath=[];
+			for (let x=townx-ourparamstown[i][2]; x!=townx+ourparamstown[i][2]; x++)
+			{
+				for (let y=towny-ourparamstown[i][2]; y!=townx+ourparamstown[i][2]; y++)
+				{
+			       pix = cncl.getImageData(x, y, 1, 1).data;
+			       let hex = "#" + ("000000" + rgbToHex(pix[0], pix[1], pix[2])).slice(-6);
+			       if (hex=="#373762"||hex=="#373762"||hex=="#355c83"||hex=="#265885"||hex=="#276074"||hex=="#24597c"||hex=="#396c6c"||hex=="#3b6c72"||hex=="#225587" ||hex=="#265a81"||hex=="#245982"||hex=="#225684"||hex=="#215587"||hex=="#4d7971"||hex=="#427076"||hex=="#38677c"||hex=="#255785"||hex=="#5b7a7a") {
+						waterinpath.push([x,y])  
+					}
+					if (waterinpath.lenght!==0) {
+						for (let ii=0; ii<waterinpath.lenght; ii++) {
+							if ((Math.abs(waterinpath[ii][0]-townx)*Math.abs(waterinpath[ii][1]-towny)<waterinx*wateriny)) {
+								waterinx=waterinpath[ii][0]; 
+								wateriny=waterinpath[ii][1];
+							}
+						}
+						waterin=ourparamstown[i][2]*ourparamstown[i][2]-waterinx*wateriny;
+					};
+				}
+			}
+			if (waterin!=ourparamstown[i][2]*ourparamstown[i][2])
+				{
+					ourparamstown[i].push((Math.floor(Math.random()*waterin)+ourbuildings[i][3][1]*ourparamsbuildings[3][1]+ourbuildings[i][3][4]*ourparamsbuildings[3][4]+ourbuildings[i][3][5]*ourparamsbuildings[3][5]+ourbuildings[i][3][8]*ourparamsbuildings[3][8]));
+				} else {
+					ourparamstown[i].push((ourbuildings[i][3][1]*ourparamsbuildings[3][1]+ourbuildings[i][3][4]*ourparamsbuildings[3][4]+ourbuildings[i][3][5]*ourparamsbuildings[3][5]+ourbuildings[i][3][8]*ourparamsbuildings[3][8]));
+				};    //9 voda
+
+
+
+
+
+
+
+
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			ourparamstown[i].push(ourbuildings[i][11][0]*ourparamsbuildings[11][0]*ourparamstown[i][8]/100+ourbuildings[i][11][1]*ourparamsbuildings[11][1]+ourbuildings[i][11][2]*ourparamsbuildings[11][2]*ourparamstown[i][8]/100+ourbuildings[i][11][3]*ourparamsbuildings[11][3]+ourbuildings[i][3][0]*ourparamsbuildings[3][0]+ourbuildings[i][3][2]*ourparamsbuildings[3][2]+ourbuildings[i][3][3]*ourparamsbuildings[3][3]+ourbuildings[i][3][6]*ourparamsbuildings[3][6]); //10 base prodovolstvie sobiratelstvo + so zdanij
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+
+
+
+
+
+
+			ourparamstown[i].push(((ourparamstown[i][5]/10+ourbuildings[i][1][0]*ourparamsbuildings[1][0]+ourbuildings[i][1][1]*ourparamsbuildings[1][1]-(buildingsnumber-ourbuildings[i][1][0]-ourbuildings[i][1][1])*5)/ourparamstown[i][1]).toFixed(2)); //11 chelovecochasi
+			ourparamstown[i].push(0); //12 budget
+			ourparamstown[i].push(0); //13 nalogi
+
+			ourparamstown[i].push((Math.floor(Math.random()*11))+(ourparamstown[i][8]+ourparamstown[i][9])/(ourparamstown[i][5]+2*ourparamstown[i][12]).toFixed(2)); //14 blagopolucie
+			ourparamstown[i].push((Math.floor(Math.random()*ourparamstown[i][2]*ourparamstown[i][13])+ourparamstown[i][2]*ourparamstown[i][3])/10); //15 imigracia
+			ourparamstown[i].push(Math.floor(Math.random()*ourparamstown[i][5]/ourparamstown[i][13])); //16 emigracia
+			ourparamstown[i].push(ourparamstown[i][6]+ourparamstown[i][14]-ourparamstown[i][7]); //17 rost/spad
+
+			ourparamstown[i].push(Math.floor(Math.random()*4)); //18 avtonomnost
+			ourparamstown[i].push((buildingsnumber+ourparamstown[i][5]/20+ourparamstown[i][2])/3)/20; //19 rasshirenie - colichestvo zdanij
+		};
+
+
+clicked=[];
+
+
+
+// ВТОРАЯ ПРОБЛЕМА ТУТ !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		newDiv.addEventListener("mouseover", function(event){ 
+			clearTimeout(clear);
+			townonclickj=newDiv.id.substring(newDiv.id.lastIndexOf("n")+1,newDiv.id.lastIndexOf("_"));
+			townonclicki=newDiv.id.substring(newDiv.id.lastIndexOf("_")+1,newDiv.id.lenght);
+			if (townonclickj=='0'){
+				alter('');
+			} else {alter(townonclickj+' игрок');}
+		});
+		newDiv.addEventListener("mouseout", function(event){ 
+			document.getElementById('alter').style.display="none";
+		});
+		newDiv.addEventListener("click", function(event) {
+
+
+
+			townonclickj=newDiv.id.substring(newDiv.id.lastIndexOf("n")+1,newDiv.id.lastIndexOf("_"));
+			townonclicki=newDiv.id.substring(newDiv.id.lastIndexOf("_")+1,newDiv.id.lenght);
+
+			if (clicked.length==0||clicked.length==1) {clicked.push(townonclicki);} else {
+				clicked[0]=clicked[1];
+				clicked[1]=townonclicki;
+			};
+			
+
+			if (townonclickj=='0'){
+
+				document.getElementById("townmenu").style.display="block";
+				document.getElementById("resoursesmenu").style.display="block";
+				document.getElementById("buildingsmenu").style.display="block";
+				document.getElementById("buildermenu").style.display="block";
+				document.getElementById("bdmname").style.display="block";
+				document.getElementById("rmname").style.display="block";
+				document.getElementById("bmname").style.display="block";
+
+				while (document.getElementById("buildermenu").firstChild) {
+ 					document.getElementById("buildermenu").removeChild(document.getElementById("buildermenu").firstChild);
+				}
+				if (builderar[parseInt(townonclicki)].length!=0) {
+					for (u=1; u<=builderar[parseInt(townonclicki)][0]; u++){
+						buildering(parseInt(townonclicki),u,builderar[parseInt(townonclicki)][u][2],builderar[parseInt(townonclicki)][u][0],builderar[parseInt(townonclicki)][u][1])
+					}
+				}
+				if (builderqar[parseInt(townonclicki)].length!=0) {
+
+					newbu = document.createElement("div");
+					newbu.setAttribute("id", "que"+townonclicki.toString());
+					newbu.classList.add("acrylic","shadow","counter3");
+					newbu.innerHTML="Очередь строительства";
+					newbu.setAttribute("style", "width: 311px; top: 18px; left: 5px;");
+					document.getElementById("buildermenu").appendChild(newbu);
+
+
+					for (u=1; u<=builderqar[parseInt(townonclicki)][0]; u++){
+						builderqing(parseInt(townonclicki),u,builderqar[parseInt(townonclicki)][u][2],builderqar[parseInt(townonclicki)][u][0],builderqar[parseInt(townonclicki)][u][1])
+					}
+				}
+
+				if(newDiv.className=="stojanka"){
+
+				document.getElementById("townwat").style.border="none";
+				document.getElementById("townwat").style.color="black";
+				document.getElementById("townprod").style.border="none";
+				document.getElementById("townprod").style.color="black";
+
+				document.getElementById("townname").innerHTML=townonclicki+" стоянка";
+			
+				document.getElementById("townrang").innerHTML=ourparamstown[townonclicki][0];
+				document.getElementById("townblag").innerHTML=ourparamstown[townonclicki][13];
+				document.getElementById("townras").innerHTML=ourparamstown[townonclicki][18];
+				document.getElementById("townorg").innerHTML=ourparamstown[townonclicki][1];
+				document.getElementById("townter").innerHTML=ourparamstown[townonclicki][2];
+				document.getElementById("towninfr").innerHTML=ourparamstown[townonclicki][3];
+				document.getElementById("townadm").innerHTML=ourparamstown[townonclicki][4];
+				document.getElementById("townwat").innerHTML=ourparamstown[townonclicki][8];
+				if(ourparamstown[townonclicki][8]<(ourparamstown[townonclicki][5]/2)){
+					document.getElementById("townwat").style.border="2px solid red";
+					document.getElementById("townwat").style.color="red";
+					document.getElementById("townwat").style.boxSizing="border-box";
+				}
+				document.getElementById("townprod").innerHTML=ourparamstown[townonclicki][9];
+				if(ourparamstown[townonclicki][9]<(ourparamstown[townonclicki][5]/2)){
+					document.getElementById("townprod").style.border="2px solid red";
+					document.getElementById("townprod").style.color="red";
+					document.getElementById("townprod").style.boxSizing="border-box";
+				}
+				document.getElementById("townnas").innerHTML=ourparamstown[townonclicki][5];
+				document.getElementById("townrost").innerHTML=ourparamstown[townonclicki][16];
+				document.getElementById("townroj").innerHTML=ourparamstown[townonclicki][6];
+				document.getElementById("townsme").innerHTML=ourparamstown[townonclicki][7];
+				document.getElementById("townim").innerHTML=ourparamstown[townonclicki][14];
+				document.getElementById("townem").innerHTML=ourparamstown[townonclicki][15];
+				document.getElementById("townchel").innerHTML=ourparamstown[townonclicki][10];
+				document.getElementById("townbudj").innerHTML=ourparamstown[townonclicki][11];
+				document.getElementById("townav").innerHTML=ourparamstown[townonclicki][17];
+				document.getElementById("townnal").innerHTML=ourparamstown[townonclicki][12];
+
+				document.getElementById("bu1_1").innerHTML=ourbuildings[townonclicki][0][0];
+				document.getElementById("bu1_2").innerHTML=ourbuildings[townonclicki][0][1];
+				document.getElementById("bu1_3").innerHTML=ourbuildings[townonclicki][0][2];
+				document.getElementById("bu2_1").innerHTML=ourbuildings[townonclicki][1][0];
+				document.getElementById("bu4_1").innerHTML=ourbuildings[townonclicki][3][0];
+				document.getElementById("bu4_2").innerHTML=ourbuildings[townonclicki][3][1];
+				document.getElementById("bu4_3").innerHTML=ourbuildings[townonclicki][3][2];
+				document.getElementById("bu6_1").innerHTML=ourbuildings[townonclicki][5][0];
+				document.getElementById("bu12_1").innerHTML=ourbuildings[townonclicki][11][0];
+				document.getElementById("bu12_2").innerHTML=ourbuildings[townonclicki][11][1];
+				document.getElementById("bu12_3").innerHTML=ourbuildings[townonclicki][11][2];
+				document.getElementById("bu12_4").innerHTML=ourbuildings[townonclicki][11][3];
+				document.getElementById("bu12_5").innerHTML=ourbuildings[townonclicki][11][4];
+				document.getElementById("bu12_6").innerHTML=ourbuildings[townonclicki][11][5];
+				document.getElementById("bu12_7").innerHTML=ourbuildings[townonclicki][11][6];
+				document.getElementById("bu12_8").innerHTML=ourbuildings[townonclicki][11][7];
+				document.getElementById("bu12_9").innerHTML=ourbuildings[townonclicki][11][8];
+
+				document.getElementById("townrash").addEventListener("mouseover", function(event){
+					if (ourparamstown[townonclicki][0]===1){
+						alter('Расширить стоянку ранга 1 до ранга 2: 8 зданий населения и 10 прочих зданий');
+					} else if(ourparamstown[townonclicki][0]===2){
+						alter('Расширить стоянку ранга 2 до ранга 3: 12 зданий населения и 15 прочих зданий');
+					} else {
+						alter('Расширить стоянку ранга 3 до города: 20 зданий населения и 30 прочих зданий');
+					}
+					
+				})
+
+				// if (clicked.length==2) {
+				// 	document.getElementById("b1").removeEventListener('click', function(){
+				// 	builder(parseInt(townonclicki),0,0,0)
+				// });
+				// }
+				// document.getElementById("b1").addEventListener("click", function(){
+				// 	builder(parseInt(townonclicki),0,0,0)
+				// });
+
+
+			//2 3 butype buname
+			for (l=1; l<=12; l++){
+				if (l==1){
+					for (ll=1; ll<=4; ll++){
+						document.getElementById("b"+l+"_"+ll).onclick=function(){builder(parseInt(townonclicki),0,l-1,ll-1)};
+					}
+				}
+				if (l==2){
+					for (ll=1; ll<=3; ll++){
+						document.getElementById("b"+l+"_"+ll).onclick=function(){builder(parseInt(townonclicki),0,l-1,ll-1)};
+					}
+				}
+				if (l==3){
+					for (ll=1; ll<=10; ll++){
+						document.getElementById("b"+l+"_"+ll).onclick=function(){builder(parseInt(townonclicki),0,l-1,ll-1)};
+					}
+				}
+				if (l==4){
+					for (ll=1; ll<=9; ll++){
+						document.getElementById("b"+l+"_"+ll).onclick=function(){builder(parseInt(townonclicki),0,l-1,ll-1)};
+					}
+				}
+				if (l==5){
+					for (ll=1; ll<=18; ll++){
+						document.getElementById("b"+l+"_"+ll).onclick=function(){builder(parseInt(townonclicki),0,l-1,ll-1)};
+					}
+				}
+				if (l==6){
+					for (ll=1; ll<=10; ll++){
+						document.getElementById("b"+l+"_"+ll).onclick=function(){builder(parseInt(townonclicki),0,l-1,ll-1)};
+					}
+				}
+				if (l==7){
+					for (ll=1; ll<=6; ll++){
+						document.getElementById("b"+l+"_"+ll).onclick=function(){builder(parseInt(townonclicki),0,l-1,ll-1)};
+					}
+				}
+				if (l==8){
+					for (ll=1; ll<=12; ll++){
+						document.getElementById("b"+l+"_"+ll).onclick=function(){builder(parseInt(townonclicki),0,l-1,ll-1)};
+					}
+				}
+				if (l==9){
+					for (ll=1; ll<=12; ll++){
+						document.getElementById("b"+l+"_"+ll).onclick=function(){builder(parseInt(townonclicki),0,l-1,ll-1)};
+					}
+				}
+				if (l==10){
+					for (ll=1; ll<=10; ll++){
+						document.getElementById("b"+l+"_"+ll).onclick=function(){builder(parseInt(townonclicki),0,l-1,ll-1)};
+					}
+				}
+				if (l==11){
+					for (ll=1; ll<=4; ll++){
+						document.getElementById("b"+l+"_"+ll).onclick=function(){builder(parseInt(townonclicki),0,l-1,ll-1)};
+					}
+				}
+				if (l==12){
+					for (ll=1; ll<=15; ll++){
+						document.getElementById("b"+l+"_"+ll).onclick=function(){builder(parseInt(townonclicki),0,l-1,ll-1)};
+					}
+				}
+			}
+
+			}
+			} else {
+				console.log("not our town"+townonclickj);
+			};
+		});
+	};
+
+console.log("render player");
+};
+
+tribescount=Math.floor(mintribes + Math.random() * (maxtribes + 1 - mintribes));
+for (i=0; i<tribescount; i++){
+	let townx,towny,townswhilebreaker=true,newDiv,newdivid,town;
+	while(townswhilebreaker){
+		townx=Math.floor(Math.random()*5001);
+		towny=Math.floor(Math.random()*5001);
+
+    	let pix = cncl.getImageData(townx, towny, 1, 1).data;
+    	let hex = "#" + ("000000" + rgbToHex(pix[0], pix[1], pix[2])).slice(-6);
+    	if (hex!=="#44447a"&&hex!=="#434379"&&hex!=="32f6666"&&hex!=="#336699"&&hex!=="#43437a"&&hex!=="#424278"&&hex!=="#434379") break;
+	}
+	tribes.push([townx,towny]);
+
+	newDiv = document.createElement("div");
+	newDiv.className = "stojanka";
+	newdivid='towntribes_'+i.toString();
+	newDiv.setAttribute("id", newdivid);
+	newDiv.setAttribute("style", "background-color: darkgrey; ");
+	document.getElementById("townstribes").appendChild(newDiv);
+	town=jQuery(document.getElementById(newdivid));
+	town.offset({top: tribes[i][1], left: tribes[i][0]});
+}
+
+
+
+// window.onload=function(){
+// 	window.scroll(spawnplayers[0][2]-400,spawnplayers[0][3]-400); 
+// }
+
+
+
+</script>
+
+<div id="mouseouter1" style="position: fixed; width: 100%; right: 0px; top: 0px; left: 0px; height: 10px;"></div>
+<div id="mouseouter2" style="position: fixed; height: 100%; bottom: 0px; top: 0px; left: 0px; width: 10px;"></div>
+<div id="mouseouter3" style="position: fixed; height: 100%; right: 0px; top: 0px; width: 10px; float: right;"></div>
+<div id="mouseouter4" style="position: fixed; width: 100%; right: 0px; bottom: 0px; left: 0px; height: 10px;"></div>
+<script>
+document.getElementById('mouseouter1').onmouseout=function(){clearTimeout(clear);};
+document.getElementById('mouseouter1').onmouseover=function(){mousemover();};
+document.getElementById('mouseouter2').onmouseout=function(){clearTimeout(clear);};
+document.getElementById('mouseouter2').onmouseover=function(){mousemover();};
+document.getElementById('mouseouter3').onmouseout=function(){clearTimeout(clear);};
+document.getElementById('mouseouter3').onmouseover=function(){mousemover();};
+document.getElementById('mouseouter4').onmouseout=function(){clearTimeout(clear);};
+document.getElementById('mouseouter4').onmouseover=function(){mousemover();};
+
+</script>
+
+
+<div id="alter" class="acrylic shadow" style="position: fixed; z-index: 10; top:; left:; display: none; opacity: 0.8; background-color: grey; max-width: 200px; font-size: small;"></div>
+<script>
+function alter(text){
+document.getElementById('alter').style.top=mouse_y+"px";
+if (mouse_x>1400) {
+	document.getElementById('alter').style.left=mouse_x-50+"px";
+	document.getElementById('alter').style.top=mouse_y+"px";
+} else {
+	document.getElementById('alter').style.left=15+mouse_x+"px";
+	document.getElementById('alter').style.top=mouse_y+"px";
+}; 
+document.getElementById('alter').style.display="block";
+document.getElementById('alter').innerHTML=text;
+}
+</script>
+
+<script>
+		  let bb1=bb2=bb3=bb4=bb5=bb6=bb7=bb8=bb9=bb10=bb11=bb12=sb1=sb2=sb3=sb4=sb5=sb6=sb7=sb8=sb9=sb10=sb11=sb12=pb1=pb2=pb3=pb4=pb5=pb6=pb7=pb8=pb9=pb10=pb11=pb12=20;
+		  let clickedpr1=clickedpr2=clickedpr3=clickedpr4=false;
+		  let base1=Math.floor(Math.random()*101), get1=Math.floor(Math.random()*101), set1=0, potent1=Math.floor(Math.random()*101);
+		  let base2=Math.floor(Math.random()*101), get2=Math.floor(Math.random()*101), set2=0, potent2=Math.floor(Math.random()*101);
+		  let base3=Math.floor(Math.random()*101), get3=Math.floor(Math.random()*101), set3=0, potent3=Math.floor(Math.random()*101);
+		  let base4=Math.floor(Math.random()*101), get4=Math.floor(Math.random()*101), set4=0, potent4=Math.floor(Math.random()*101);
+		  document.getElementById("progrp_01").innerHTML="Общество:"+"  "+base1+"  (+"+get1+") (-"+set1+")  / "+(base1+get1+set1+potent1);
+		  document.getElementById("progrp_02").innerHTML="Государство:"+"  "+base2+"  (+"+get2+") (-"+set2+")  / "+(base2+get2+set2+potent2);
+		  document.getElementById("progrp_03").innerHTML="Армия:"+"  "+base3+"  (+"+get3+") (-"+set3+")  / "+(base3+get3+set3+potent3);
+		  document.getElementById("progrp_04").innerHTML="Влияние:"+"  "+base4+"  (+"+get4+") (-"+set4+")  / "+(base4+get4+set4+potent4);
+
+
+		  document.getElementById("progr_01").style["grid-template-columns"]=base1*100/(base1+get1+set1+potent1)+"% "+get1*100/(base1+get1+set1+potent1)+"% "+set1*100/(base1+get1+set1+potent1)+"% "+potent1*100/(base1+get1+set1+potent1)+"% ";
+		  document.getElementById("progr_01").onclick=function(){
+		  	window.scroll(spawnplayers[0][2]-400,spawnplayers[0][3]-400);
+		  	
+		  	if (!clickedpr1){
+		  	clickedpr1=true; clickedpr2=clickedpr3=clickedpr4=false;
+		  	document.getElementById("wrapper").style.display="grid";
+
+		  	document.getElementById("m1").style["grid-template-columns"]=bb1*100/(bb1+sb1+pb1)+"%"+sb1*100/(bb1+sb1+pb1)+"%"+pb1*100/(bb1+sb1+pb1)+"%";
+		  	document.getElementById("mp1").innerHTML="Цивилизованность:";
+
+		  	document.getElementById("m2").style["grid-template-columns"]=bb2*100/(bb2+sb2+pb2)+"%"+sb2*100/(bb2+sb2+pb2)+"%"+pb2*100/(bb2+sb2+pb2)+"%";
+		  	document.getElementById("mp2").innerHTML="Расширение:";
+
+		  	document.getElementById("m3").style["grid-template-columns"]=bb3*100/(bb3+sb3+pb3)+"%"+sb3*100/(bb3+sb3+pb3)+"%"+pb3*100/(bb3+sb3+pb3)+"%";
+		  	document.getElementById("mp3").innerHTML="Благополучие:";
+
+		  	document.getElementById("m4").innerHTML="Продовольствие";
+		  	document.getElementById("m5").innerHTML="Культура";
+		  	document.getElementById("m6").innerHTML="Наука";
+		  	document.getElementById("m7").innerHTML="Промышленность";
+		  	document.getElementById("m8").innerHTML="Экономика";
+		  	document.getElementById("m9").innerHTML="Строительство";
+		  } else {
+		  	document.getElementById("wrapper").style.display="none";
+		  	clickedpr1=false;
+		  }
+		};
+		  
+		  document.getElementById("progr_02").style["grid-template-columns"]=base2*100/(base2+get2+set2+potent2)+"% "+get2*100/(base2+get2+set2+potent2)+"% "+set2*100/(base2+get2+set2+potent2)+"% "+potent2*100/(base2+get2+set2+potent2)+"% ";
+		  document.getElementById("progr_02").onclick=function(){
+		  	window.scroll(spawnplayers[0][2]-400,spawnplayers[0][3]-400);
+
+		  	if (!clickedpr2){
+		  	clickedpr2=true; clickedpr1=clickedpr3=clickedpr4=false;
+		  	document.getElementById("wrapper").style.display="grid";
+		  	
+		  	document.getElementById("m1").style["grid-template-columns"]=bb4*100/(bb4+sb4+pb4)+"%"+sb4*100/(bb4+sb4+pb4)+"%"+pb4*100/(bb4+sb4+pb4)+"%";
+		  	document.getElementById("mp1").innerHTML="Доверие:";
+
+		  	document.getElementById("m2").style["grid-template-columns"]=bb5*100/(bb5+sb5+pb5)+"%"+sb5*100/(bb5+sb5+pb5)+"%"+pb5*100/(bb5+sb5+pb5)+"%";
+		  	document.getElementById("mp2").innerHTML="Легитимность:";
+
+		  	document.getElementById("m3").style["grid-template-columns"]=bb6*100/(bb6+sb6+pb6)+"%"+sb6*100/(bb6+sb6+pb6)+"%"+pb6*100/(bb6+sb6+pb6)+"%";
+		  	document.getElementById("mp3").innerHTML="Порядок:";
+
+		  	document.getElementById("m4").innerHTML="Стабильность";
+		  	document.getElementById("m5").innerHTML="Бюджет";
+		  	document.getElementById("m6").innerHTML="Довольство";
+		  	document.getElementById("m7").innerHTML="Администрирование";
+		  	document.getElementById("m8").innerHTML="Двор и политика";
+		  	document.getElementById("m9").innerHTML="Иностранные дела";
+		  	} else {
+		  	document.getElementById("wrapper").style.display="none";
+		  	clickedpr2=false;
+		  }
+		  };
+		  
+		  document.getElementById("progr_03").style["grid-template-columns"]=base3*100/(base3+get3+set3+potent3)+"% "+get3*100/(base3+get3+set3+potent3)+"% "+set3*100/(base3+get3+set3+potent3)+"% "+potent3*100/(base3+get3+set3+potent3)+"% ";
+		  document.getElementById("progr_03").onclick=function(){
+		  	window.scroll(spawnplayers[0][2]-400,spawnplayers[0][3]-400);
+
+		  	if (!clickedpr3){
+		  	clickedpr3=true; clickedpr1=clickedpr2=clickedpr4=false;
+		  	document.getElementById("wrapper").style.display="grid";
+		  	
+		  	document.getElementById("m1").style["grid-template-columns"]=bb7*100/(bb7+sb7+pb7)+"%"+sb7*100/(bb7+sb7+pb7)+"%"+pb7*100/(bb7+sb7+pb7)+"%";
+		  	document.getElementById("mp1").innerHTML="Командиры:";
+
+		  	document.getElementById("m2").style["grid-template-columns"]=bb8*100/(bb8+sb8+pb8)+"%"+sb8*100/(bb8+sb8+pb8)+"%"+pb8*100/(bb8+sb8+pb8)+"%";
+		  	document.getElementById("mp2").innerHTML="Сержанты:";
+
+		  	document.getElementById("m3").style["grid-template-columns"]=bb9*100/(bb9+sb9+pb9)+"%"+sb9*100/(bb9+sb9+pb9)+"%"+pb9*100/(bb9+sb9+pb9)+"%";
+		  	document.getElementById("mp3").innerHTML="Достижения:";
+
+		  	document.getElementById("m4").innerHTML="Резерв";
+		  	document.getElementById("m5").innerHTML="Рекруты";
+		  	document.getElementById("m6").innerHTML="Дисциплина";
+		  	document.getElementById("m7").innerHTML="Военное дело";
+		  	document.getElementById("m8").innerHTML="Охранение";
+		  	document.getElementById("m9").innerHTML="Обороноспособность";
+		  	} else {
+		  	document.getElementById("wrapper").style.display="none";
+		  	clickedpr3=false;
+		  }
+		  };
+		  
+		  document.getElementById("progr_04").style["grid-template-columns"]=base4*100/(base4+get4+set4+potent4)+"% "+get4*100/(base4+get4+set4+potent4)+"% "+set4*100/(base4+get4+set4+potent4)+"% "+potent4*100/(base4+get4+set4+potent4)+"% ";
+		  document.getElementById("progr_04").onclick=function(){
+
+		  	if (!clickedpr4){
+		  	clickedpr4=true; clickedpr1=clickedpr2=clickedpr3=false;
+		  	document.getElementById("wrapper").style.display="grid";
+		  	document.getElementById("m1").style["grid-template-columns"]=bb10*100/(bb10+sb10+pb10)+"%"+sb10*100/(bb10+sb10+pb10)+"%"+pb10*100/(bb10+sb10+pb10)+"%";
+		  	document.getElementById("mp1").innerHTML="Значимость:";
+
+		  	document.getElementById("m2").style["grid-template-columns"]=bb11*100/(bb11+sb11+pb11)+"%"+sb11*100/(bb11+sb11+pb11)+"%"+pb11*100/(bb11+sb11+pb11)+"%";
+		  	document.getElementById("mp2").innerHTML="Лидерство:";
+
+		  	document.getElementById("m3").style["grid-template-columns"]=bb12*100/(bb12+sb12+pb12)+"%"+sb12*100/(bb12+sb12+pb12)+"%"+pb12*100/(bb12+sb12+pb12)+"%";
+		  	document.getElementById("mp3").innerHTML="Превосходство:";
+
+		  	document.getElementById("m4").innerHTML="Дома";
+		  	document.getElementById("m5").innerHTML="Партии";
+		  	document.getElementById("m6").innerHTML="Собственники";
+		  	document.getElementById("m7").innerHTML="Командиры";
+		  	document.getElementById("m8").innerHTML="Сержанты";
+		  	document.getElementById("m9").innerHTML="Владения";
+		  	} else {
+		  	document.getElementById("wrapper").style.display="none";
+		  	clickedpr4=false;
+		  }
+		  }
+</script>
+
+</body>
+</html>
